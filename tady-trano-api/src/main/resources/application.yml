@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: tady-trano-api
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8}
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:eemntirey}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  # Jackson 3 (Spring Boot 4) serialise deja les dates en ISO-8601 par defaut :
+  # la propriete spring.jackson.serialization.write-dates-as-timestamps n'existe plus.
+server:
+  port: 8080
+  error:
+    include-message: always
+
+jwt:
+  # Secret local par defaut (dev uniquement — pas de production)
+  secret: ${JWT_SECRET:eX09jEKwZJw105ujFfy9kTXqcce/VG3qSitjNOMbZdcQGhdTcvfl7Vi02J6SvD3LHNepXhrHDPuaTvP8O9pqsg==}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

@@ -1,0 +1,177 @@
+package mg.emit.tadytrano.client.vue;
+
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import mg.emit.tadytrano.client.TadyTranoApp;
+import mg.emit.tadytrano.client.api.ApiClient;
+import mg.emit.tadytrano.client.dto.AnnonceResumeResponse;
+import mg.emit.tadytrano.client.dto.PageResponse;
+import mg.emit.tadytrano.client.dto.StatutAnnonceRequest;
+import mg.emit.tadytrano.client.util.Affichage;
+
+/**
+ * Espace moderation et administration (CDC F10).
+ * Reserve a l'administrateur de la plateforme Tady Trano.
+ */
+public class VueAdmin extends VBox {
+
+    private static final int TAILLE_PAGE = 12;
+
+    private final TadyTranoApp app;
+    private final ApiClient api;
+
+    private final ComboBox<String> filtreStatut = new ComboBox<>();
+    private final VBox listeAdmin = new VBox(10);
+    private final Label pageLabel = new Label();
+    private final Button precedent = new Button("<");
+    private final Button suivant = new Button(">");
+    private final Label messageVide = new Label("Aucune annonce dans cette catégorie.");
+
+    private int page = 0;
+    private int totalPages = 0;
+
+    public VueAdmin(TadyTranoApp app, ApiClient api) {
+        this.app = app;
+        this.api = api;
+        construire();
+        charger();
+    }
+
+    private void construire() {
+        setSpacing(15);
+        setPadding(new Insets(20));
+
+        HBox enTete = new HBox(15);
+        enTete.setAlignment(Pos.CENTER_LEFT);
+
+        Label titre = new Label("Administration & Modération des Annonces");
+        titre.setFont(Font.font("System", FontWeight.BOLD, 22));
+
+        Region espace = new Region();
+        HBox.setHgrow(espace, Priority.ALWAYS);
+
+        filtreStatut.getItems().addAll("TOUS", "ACTIVE", "LOUEE", "MASQUEE");
+        filtreStatut.getSelectionModel().select(0);
+        filtreStatut.setOnAction(e -> {
+            page = 0;
+            charger();
+        });
+
+        HBox filtreBox = new HBox(8, new Label("Filtrer par statut :"), filtreStatut);
+        filtreBox.setAlignment(Pos.CENTER_RIGHT);
+
+        enTete.getChildren().addAll(titre, espace, filtreBox);
+
+        // Pagination
+        precedent.setOnAction(e -> {
+            if (page > 0) {
+                page--;
+                charger();
+            }
+        });
+        suivant.setOnAction(e -> {
+            if (page < totalPages - 1) {
+                page++;
+                charger();
+            }
+        });
+
+        HBox pagination = new HBox(10, precedent, pageLabel, suivant);
+        pagination.setAlignment(Pos.CENTER);
+        pagination.setPadding(new Insets(10));
+
+        ScrollPane scroll = new ScrollPane(listeAdmin);
+        scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+
+        getChildren().addAll(enTete, new Separator(), messageVide, scroll, pagination);
+    }
+
+    private void charger() {
+        String statutSelectionne = filtreStatut.getValue();
+        String param = ("TOUS".equals(statutSelectionne)) ? null : statutSelectionne;
+
+        app.appeler(() -> api.toutesLesAnnonces(param, page, TAILLE_PAGE), this::afficherResultats);
+    }
+
+    private void afficherResultats(PageResponse<AnnonceResumeResponse> reponse) {
+        listeAdmin.getChildren().clear();
+        totalPages = reponse.totalPages();
+        pageLabel.setText("Page " + (totalPages == 0 ? 0 : page + 1) + " / " + totalPages + " (" + reponse.totalElements() + " annonces au total)");
+        precedent.setDisable(page <= 0);
+        suivant.setDisable(page >= totalPages - 1 || totalPages == 0);
+
+        if (reponse.contenu().isEmpty()) {
+            messageVide.setText("Aucune annonce trouvée avec ce statut.");
+            messageVide.setVisible(true);
+            return;
+        }
+
+        messageVide.setVisible(false);
+        for (AnnonceResumeResponse annonce : reponse.contenu()) {
+            listeAdmin.getChildren().add(creerLigneAdmin(annonce));
+        }
+    }
+
+    private HBox creerLigneAdmin(AnnonceResumeResponse a) {
+        HBox ligne = new HBox(15);
+        ligne.setAlignment(Pos.CENTER_LEFT);
+        ligne.setPadding(new Insets(12));
+        ligne.setStyle("-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 4, 0, 0, 1);");
+
+        ImageView image = Affichage.vignette(a.urlPhotoPrincipale(), 110, 75);
+
+        VBox infos = new VBox(4);
+        Label idTitre = new Label("#" + a.id() + " - " + a.titre());
+        idTitre.setFont(Font.font("System", FontWeight.BOLD, 14));
+
+        String loc = (a.quartier() != null ? a.quartier().nom() + ", " : "")
+                + (a.quartier() != null && a.quartier().ville() != null ? a.quartier().ville().nom() : "");
+        Label locLabel = new Label(loc + " • " + a.nbPieces() + " pièce(s) • " + Affichage.prix(a.prix()));
+        locLabel.setStyle("-fx-text-fill: #7f8c8d;");
+
+        infos.getChildren().addAll(idTitre, locLabel);
+        HBox.setHgrow(infos, Priority.ALWAYS);
+
+        // Badge statut
+        Label statutBadge = new Label(a.statut());
+        statutBadge.setPadding(new Insets(4, 8, 4, 8));
+        switch (a.statut()) {
+            case "ACTIVE" -> statutBadge.setStyle("-fx-background-color: #d4edda; -fx-text-fill: #155724; -fx-background-radius: 4; -fx-font-weight: bold;");
+            case "LOUEE" -> statutBadge.setStyle("-fx-background-color: #fff3cd; -fx-text-fill: #856404; -fx-background-radius: 4; -fx-font-weight: bold;");
+            default -> statutBadge.setStyle("-fx-background-color: #f8d7da; -fx-text-fill: #721c24; -fx-background-radius: 4; -fx-font-weight: bold;");
+        }
+
+        // Actions de moderation
+        Button detailBtn = new Button("Aperçu");
+        detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), this::charger));
+
+        Button activerBtn = new Button("Valider / Activer");
+        activerBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white;");
+        activerBtn.setOnAction(e -> moderer(a.id(), "ACTIVE"));
+        activerBtn.setDisable("ACTIVE".equals(a.statut()));
+
+        Button masquerBtn = new Button("Masquer (Abus)");
+        masquerBtn.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white;");
+        masquerBtn.setOnAction(e -> moderer(a.id(), "MASQUEE"));
+        masquerBtn.setDisable("MASQUEE".equals(a.statut()));
+
+        HBox boutons = new HBox(8, statutBadge, detailBtn, activerBtn, masquerBtn);
+        boutons.setAlignment(Pos.CENTER_RIGHT);
+
+        ligne.getChildren().addAll(image, infos, boutons);
+        return ligne;
+    }
+
+    private void moderer(Long id, String statut) {
+        app.appeler(() -> {
+            api.modererAnnonce(id, new StatutAnnonceRequest(statut));
+            return null;
+        }, r -> charger());
+    }
+}
