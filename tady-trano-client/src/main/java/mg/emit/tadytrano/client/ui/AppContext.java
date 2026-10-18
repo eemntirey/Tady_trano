@@ -30,7 +30,7 @@ public class AppContext {
     private final List<Runnable> authChangeListeners = new ArrayList<>();
 
     private AppContext() {
-        String baseUrl = System.getProperty("tady.api.url", "http://localhost:8080");
+        String baseUrl = System.getProperty("tady.api.url", "http://localhost:8081");
         this.apiClient = new ApiClient(baseUrl, session);
     }
 

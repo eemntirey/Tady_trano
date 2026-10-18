@@ -463,4 +463,42 @@ class AnnonceControllerTest {
                 .andExpect(jsonPath("$.contenu[0].titre").value("Maison Fianarantsoa"))
                 .andExpect(jsonPath("$.contenu[1].titre").value("Villa Antananarivo"));
     }
+
+    // ------------------------------------------------------------------
+    // Tests de droits (1.3 du document Jhonny)
+    // ------------------------------------------------------------------
+
+    @Test
+    void autreProprietaireModificationInterditeRenvoie403() throws Exception {
+        String jetonA = proprietaireConnecte();
+        Long typeLocationId = typeLocationId();
+        Long quartierId = jdbc.queryForObject("SELECT id FROM quartier LIMIT 1", Long.class);
+        mockMvc.perform(post("/api/annonces")
+                        .header("Authorization", "Bearer " + jetonA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(annonceJson(typeLocationId, quartierId)))
+                .andExpect(status().isCreated());
+        Long annonceId = jdbc.queryForObject("SELECT id FROM annonce", Long.class);
+
+        String jetonB = inscrire(emailUnique(), Role.PROPRIETAIRE);
+        mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonB)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"MASQUEE\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void locataireSurEndpointAdminRenvoie403() throws Exception {
+        String jetonLocataire = inscrire(emailUnique(), Role.LOCATAIRE);
+        mockMvc.perform(get("/api/admin/annonces")
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void requeteProtegeeSansJetonRenvoie401() throws Exception {
+        mockMvc.perform(get("/api/admin/annonces"))
+                .andExpect(status().isUnauthorized());
+    }
 }

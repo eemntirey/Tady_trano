@@ -15,7 +15,10 @@
     <description>Client desktop JavaFX de l'application de location de maisons</description>
 
     <properties>
-        <javafx.version>21.0.5</javafx.version>
+        <!-- 27 : aligne sur le JDK 27 installe ici ; depuis JavaFX 24 le module
+             jdk.jsobject (exige par javafx.web) est fourni par JavaFX lui-meme,
+             il a ete supprime du JDK en 26 -->
+        <javafx.version>27</javafx.version>
     </properties>
 
     <dependencies>
