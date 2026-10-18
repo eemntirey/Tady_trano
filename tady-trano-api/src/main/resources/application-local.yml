@@ -12,5 +12,10 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+  show-sql: true
   flyway:
     enabled: false

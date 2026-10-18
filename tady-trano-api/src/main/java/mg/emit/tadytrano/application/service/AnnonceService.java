@@ -85,11 +85,17 @@ public class AnnonceService {
                 resultats.getTotalElements(), resultats.getTotalPages());
     }
 
-    /** Detail public ; contact du proprietaire renseigne si l'utilisateur est connecte. */
+    /** Detail public ; contact du proprietaire renseigne si l'utilisateur est connecte.
+     *  Si l'annonce n'est pas ACTIVE, elle reste visible uniquement au proprietaire
+     *  ou a un administrateur ; sinon 404. */
     @Transactional(readOnly = true)
     public AnnonceDetailResponse detail(Long id) {
         Annonce annonce = annonceRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Annonce introuvable"));
+
+        if (annonce.getStatut() != StatutAnnonce.ACTIVE && !estProprietaireOuAdmin(annonce)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Annonce introuvable");
+        }
 
         List<PhotoResponse> photos = photoRepository.findByAnnonceIdOrderByOrdreAsc(id).stream()
                 .map(PhotoResponse::depuis).toList();
@@ -207,6 +213,13 @@ public class AnnonceService {
 
     @Transactional(readOnly = true)
     public List<PhotoResponse> photos(Long id) {
+        Annonce annonce = annonceRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Annonce introuvable"));
+
+        if (annonce.getStatut() != StatutAnnonce.ACTIVE && !estProprietaireOuAdmin(annonce)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Annonce introuvable");
+        }
+
         return photoRepository.findByAnnonceIdOrderByOrdreAsc(id).stream()
                 .map(PhotoResponse::depuis).toList();
     }
@@ -337,6 +350,28 @@ public class AnnonceService {
         return photos.stream()
                 .filter(Photo::isPrincipale)
                 .collect(Collectors.toMap(p -> p.getAnnonce().getId(), Photo::getUrl, (a, b) -> a));
+    }
+
+    private boolean estProprietaireOuAdmin(Annonce annonce) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            return false;
+        }
+        Object principal = auth.getPrincipal();
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails user) {
+            // Admin
+            boolean estAdmin = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            if (estAdmin) {
+                return true;
+            }
+            // Proprietaire : comparer l'email du proprietaire avec celui de l'utilisateur
+            String emailProp = annonce.getProprietaire() != null
+                    && annonce.getProprietaire().getUtilisateur() != null
+                    ? annonce.getProprietaire().getUtilisateur().getEmail() : null;
+            return user.getUsername().equalsIgnoreCase(emailProp);
+        }
+        return false;
     }
 
     private boolean estConnecte() {

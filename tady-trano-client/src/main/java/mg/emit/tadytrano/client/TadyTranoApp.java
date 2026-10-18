@@ -40,7 +40,9 @@ public class TadyTranoApp extends Application {
 
     @Override
     public void start(Stage fenetre) {
-        String base = System.getProperty("tady.api.url", "http://localhost:8080");
+        // URL de l'API : -Dtady.api.url, puis variable TADY_API_URL, puis defaut local
+        String base = System.getProperty("tady.api.url",
+                System.getenv().getOrDefault("TADY_API_URL", "http://localhost:8081"));
         api = new ApiClient(base, session);
 
         racine = new BorderPane();

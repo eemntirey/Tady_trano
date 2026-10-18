@@ -379,6 +379,39 @@ class AnnonceControllerTest {
     }
 
     @Test
+    void lectureAnnonceMasqueeParIdentifiantRenvoie404() throws Exception {
+        String jeton = proprietaireConnecte();
+        Long typeLocationId = typeLocationId();
+        Long quartierId = jdbc.queryForObject("SELECT id FROM quartier LIMIT 1", Long.class);
+        mockMvc.perform(post("/api/annonces")
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(annonceJson(typeLocationId, quartierId)))
+                .andExpect(status().isCreated());
+        Long annonceId = jdbc.queryForObject("SELECT id FROM annonce", Long.class);
+
+        // Masquer l'annonce
+        mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"MASQUEE\"}"))
+                .andExpect(status().isNoContent());
+
+        // Un utilisateur anonyme ne doit pas voir l'annonce masquee par id
+        mockMvc.perform(get("/api/annonces/" + annonceId))
+                .andExpect(status().isNotFound());
+
+        // Un autre proprietaire non plus
+        String autreJeton = inscrire(emailUnique(), Role.PROPRIETAIRE);
+        mockMvc.perform(get("/api/annonces/" + annonceId).header("Authorization", "Bearer " + autreJeton))
+                .andExpect(status().isNotFound());
+
+        // Mais le proprietaire legitime peut
+        mockMvc.perform(get("/api/annonces/" + annonceId).header("Authorization", "Bearer " + jeton))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void triParDistanceCroissanteMultiAnnonces() throws Exception {
         String jeton = proprietaireConnecte();
         Long typeId = typeLocationId();
