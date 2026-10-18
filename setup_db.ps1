@@ -1,2 +1,0 @@
-"C:\Program Files\MariaDB 13.0\bin\mysql.exe" -u root --port=3306 -e "CREATE DATABASE IF NOT EXISTS tady_trano CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-"C:\Program Files\MariaDB 13.0\bin\mysql.exe" -u root --port=3306 -e "SHOW DATABASES;"

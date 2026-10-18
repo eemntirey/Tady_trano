@@ -9,3 +9,9 @@ target/
 .project
 .classpath
 .playwright-mcp/
+setup.sql
+setup_db.sql
+setup_db.bat
+setup_db.ps1
+root_info.sql
+set_root_pass.sql
