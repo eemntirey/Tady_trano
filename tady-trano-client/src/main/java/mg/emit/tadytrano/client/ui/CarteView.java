@@ -25,6 +25,8 @@ public class CarteView extends StackPane {
     private Double latAttente;
     private Double lngAttente;
     private String labelAttente;
+    /** [lat, lng, zoom] si un centrage est demande avant le chargement de la page. */
+    private Double[] centrageEnAttente;
 
     public CarteView() {
         getChildren().add(webView);
@@ -36,6 +38,10 @@ public class CarteView extends StackPane {
                 win.setMember("javaBridge", bridge);
                 pageChargee = true;
 
+                // Le evenement window.load de map.html a pu se declencher AVANT
+                // l'injection du pont : on notifie explicitement que la carte est prete.
+                bridge.onMapReady();
+
                 if (annoncesEnAttente != null) {
                     afficherAnnonces(annoncesEnAttente);
                     annoncesEnAttente = null;
@@ -45,6 +51,11 @@ public class CarteView extends StackPane {
                     latAttente = null;
                     lngAttente = null;
                     labelAttente = null;
+                }
+                if (centrageEnAttente != null) {
+                    webEngine.executeScript("flyTo(" + centrageEnAttente[0] + ", "
+                            + centrageEnAttente[1] + ", " + centrageEnAttente[2].intValue() + ");");
+                    centrageEnAttente = null;
                 }
             }
         });
@@ -90,8 +101,16 @@ public class CarteView extends StackPane {
     }
 
     public void centrerSur(Double lat, Double lng, int zoom) {
-        if (pageChargee && lat != null && lng != null) {
-            webEngine.executeScript("flyTo(" + lat + ", " + lng + ", " + zoom + ");");
+        if (lat == null || lng == null
+                || !Double.isFinite(lat) || !Double.isFinite(lng)
+                || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            return;
         }
+        if (!pageChargee) {
+            // Clic trop tot : on memorise le centrage pour l'appliquer apres le chargement.
+            centrageEnAttente = new Double[] { lat, lng, (double) zoom };
+            return;
+        }
+        webEngine.executeScript("flyTo(" + lat + ", " + lng + ", " + zoom + ");");
     }
 }

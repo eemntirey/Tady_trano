@@ -44,11 +44,15 @@ public class CarteBridge {
         });
     }
 
-    /** Appele lorsque la carte Leaflet est prete et chargee. */
+    /** Appele lorsque la carte Leaflet est prete et chargee (une seule fois,
+     *  meme si le JS rappelle : evite de charger les annonces deux fois). */
     public void onMapReady() {
         Platform.runLater(() -> {
-            if (mapReadyListener != null) {
-                mapReadyListener.run();
+            Runnable listener = mapReadyListener;
+            // One-shot : on detruit l'ecouteur AVANT l'appel (re-entrant possible).
+            mapReadyListener = null;
+            if (listener != null) {
+                listener.run();
             }
         });
     }

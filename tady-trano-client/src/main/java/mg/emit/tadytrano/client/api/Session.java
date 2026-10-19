@@ -9,6 +9,8 @@ public class Session {
 
     private final BooleanProperty connecte = new SimpleBooleanProperty(false);
     private final BooleanProperty admin = new SimpleBooleanProperty(false);
+    /** Vrai uniquement pour le role strict PROPRIETAIRE (routes /api/proprietaires). */
+    private final BooleanProperty proprietaire = new SimpleBooleanProperty(false);
     private String jeton;
     private ProfilResponse profil;
 
@@ -17,6 +19,7 @@ public class Session {
         this.profil = profil;
         this.connecte.set(true);
         this.admin.set("ADMIN".equals(profil == null ? null : profil.role()));
+        this.proprietaire.set("PROPRIETAIRE".equals(profil == null ? null : profil.role()));
     }
 
     public void deconnecter() {
@@ -24,6 +27,7 @@ public class Session {
         this.profil = null;
         this.connecte.set(false);
         this.admin.set(false);
+        this.proprietaire.set(false);
     }
 
     /** Propriete FX : true si un compte est connecte. */
@@ -34,6 +38,11 @@ public class Session {
     /** Propriete FX : true si le compte courant est administrateur. */
     public BooleanProperty adminProperty() {
         return admin;
+    }
+
+    /** Propriete FX : true si le compte courant est strictement PROPRIETAIRE. */
+    public BooleanProperty proprietaireProperty() {
+        return proprietaire;
     }
 
     public boolean estConnecte() {
@@ -52,9 +61,9 @@ public class Session {
         return profil == null ? null : profil.email();
     }
 
-    /** PROPRIETAIRE ou ADMIN : peut publier et gerer des annonces. */
+    /** PROPRIETAIRE strict : le serveur refuse les routes proprietaires aux ADMIN. */
     public boolean estProprietaire() {
-        return estAvecRole("PROPRIETAIRE") || estAvecRole("ADMIN");
+        return estAvecRole("PROPRIETAIRE");
     }
 
     public boolean estAdmin() {

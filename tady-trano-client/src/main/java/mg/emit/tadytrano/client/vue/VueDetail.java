@@ -55,7 +55,10 @@ public class VueDetail extends VBox {
         HBox vignettes = new HBox(8);
         for (PhotoResponse photo : annonce.photos()) {
             ImageView v = Affichage.vignette(photo.url(), 90, 60);
-            v.setOnMouseClicked(e -> principale.setImage(v.getImage()));
+            // On recharge l'image en taille principale (640x380) depuis l'URL,
+            // et non la vignette 90x60 deja decodee (floue).
+            v.setOnMouseClicked(e -> principale.setImage(
+                    Affichage.vignette(photo.url(), 640, 380).getImage()));
             v.getStyleClass().add("thumb-clickable");
             vignettes.getChildren().add(v);
         }
@@ -120,6 +123,7 @@ public class VueDetail extends VBox {
             return;
         }
         boolean ajoute = "Ajouter aux favoris".equals(favori.getText());
+        favori.setDisable(true); // anti double-clic pendant l'appel API
         app.appeler(() -> {
             if (ajoute) {
                 api.ajouterFavori(annonce.id());
@@ -127,7 +131,13 @@ public class VueDetail extends VBox {
                 api.retirerFavori(annonce.id());
             }
             return null;
-        }, ok -> favori.setText(ajoute ? "Retirer des favoris" : "Ajouter aux favoris"));
+        }, ok -> {
+            favori.setText(ajoute ? "Retirer des favoris" : "Ajouter aux favoris");
+            favori.setDisable(false);
+        }, err -> {
+            app.gererErreur(err);
+            favori.setDisable(false);
+        });
     }
 
     private void majLibelleFavori() {
@@ -135,8 +145,15 @@ public class VueDetail extends VBox {
             favori.setDisable(true);
             return;
         }
-        app.appeler(() -> api.mesFavoris(0, 50).contenu().stream()
-                        .anyMatch(f -> f.annonceId() == annonceId),
-                dedans -> favori.setText(dedans ? "Retirer des favoris" : "Ajouter aux favoris"));
+        favori.setDisable(true);
+        app.appeler(() -> api.estEnFavori(annonceId),
+                dedans -> {
+                    favori.setText(dedans ? "Retirer des favoris" : "Ajouter aux favoris");
+                    favori.setDisable(false);
+                },
+                err -> {
+                    app.gererErreur(err);
+                    favori.setDisable(false);
+                });
     }
 }

@@ -38,6 +38,13 @@ public final class Affichage {
         alert.showAndWait();
     }
 
+    /** Confirmation de succes non bloquante (ne fige pas la liste derriere). */
+    public static void succes(String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION, message);
+        alert.setHeaderText(null);
+        alert.show();
+    }
+
     /** Prix en ariary : 450000 -> "450 000 Ar". */
     public static String prix(BigDecimal valeur) {
         if (valeur == null) {
@@ -62,7 +69,13 @@ public final class Affichage {
                 String cle = url + "|" + (int) largeur + "x" + (int) hauteur;
                 Image image = CACHE_IMAGES.computeIfAbsent(cle,
                         k -> new Image(url, largeur, hauteur, true, true, true));
-                vue.setImage(image);
+                if (image.isError()) {
+                    // Image en echec : on ne la laisse pas dans le cache (le prochain
+                    // acces reessaiera au lieu de resservir l'erreur).
+                    CACHE_IMAGES.remove(cle);
+                } else {
+                    vue.setImage(image);
+                }
             } catch (RuntimeException ignore) {
                 // image indisponible : on garde la vignette vide
             }

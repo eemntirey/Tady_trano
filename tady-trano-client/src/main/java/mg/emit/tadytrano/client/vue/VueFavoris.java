@@ -110,6 +110,15 @@ public class VueFavoris extends VBox {
     }
 
     private void afficherResultats(PageResponse<FavoriResponse> reponse) {
+        // Apres un retrait : si la page courante n'existe plus, revenir a la derniere valide.
+        if (reponse.contenu().isEmpty() && page > 0) {
+            int dernierePage = Math.max(0, reponse.totalPages() - 1);
+            if (dernierePage != page) {
+                page = dernierePage;
+                charger();
+                return;
+            }
+        }
         conteneurCards.getChildren().clear();
         totalPages = reponse.totalPages();
         pageLabel.setText("Page " + (totalPages == 0 ? 0 : page + 1) + " / " + totalPages + " (" + reponse.totalElements() + " favoris)");
@@ -171,10 +180,21 @@ public class VueFavoris extends VBox {
 
         Button retirerBtn = new Button("Retirer");
         retirerBtn.getStyleClass().add("btn-danger-custom");
-        retirerBtn.setOnAction(e -> app.appeler(() -> {
-            api.retirerFavori(a.id());
-            return null;
-        }, res -> charger()));
+        retirerBtn.setOnAction(e -> {
+            retirerBtn.setDisable(true);
+            app.appeler(() -> {
+                api.retirerFavori(a.id());
+                return null;
+            },
+            res -> {
+                charger();
+                Affichage.succes("Annonce retirée de vos favoris.");
+            },
+            err -> {
+                retirerBtn.setDisable(false);
+                app.gererErreur(err);
+            });
+        });
 
         HBox actions = new HBox(8, detailBtn, retirerBtn);
         actions.setAlignment(Pos.CENTER_RIGHT);

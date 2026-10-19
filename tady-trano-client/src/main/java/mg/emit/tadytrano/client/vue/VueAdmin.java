@@ -95,6 +95,15 @@ public class VueAdmin extends VBox {
     }
 
     private void charger() {
+        if (!app.estAdmin()) {
+            messageVide.setText("L'espace de modération est réservé aux administrateurs.");
+            messageVide.setVisible(true);
+            listeAdmin.getChildren().clear();
+            pageLabel.setText("");
+            precedent.setDisable(true);
+            suivant.setDisable(true);
+            return;
+        }
         String statutSelectionne = filtreStatut.getValue();
         String param = ("TOUS".equals(statutSelectionne)) ? null : statutSelectionne;
         final int pageDemandee = page;
@@ -116,6 +125,15 @@ public class VueAdmin extends VBox {
     }
 
     private void afficherResultats(PageResponse<AnnonceResumeResponse> reponse) {
+        // Apres une moderation : si la page courante n'existe plus, revenir a la derniere valide.
+        if (reponse.contenu().isEmpty() && page > 0) {
+            int dernierePage = Math.max(0, reponse.totalPages() - 1);
+            if (dernierePage != page) {
+                page = dernierePage;
+                charger();
+                return;
+            }
+        }
         listeAdmin.getChildren().clear();
         totalPages = reponse.totalPages();
         pageLabel.setText("Page " + (totalPages == 0 ? 0 : page + 1) + " / " + totalPages + " (" + reponse.totalElements() + " annonces au total)");
@@ -169,12 +187,12 @@ public class VueAdmin extends VBox {
 
         Button activerBtn = new Button("Valider / Activer");
         activerBtn.getStyleClass().add("btn-success-custom");
-        activerBtn.setOnAction(e -> moderer(a.id(), "ACTIVE"));
+        activerBtn.setOnAction(e -> moderer(a.id(), "ACTIVE", activerBtn));
         activerBtn.setDisable("ACTIVE".equals(a.statut()));
 
         Button masquerBtn = new Button("Masquer (Abus)");
         masquerBtn.getStyleClass().add("btn-warning-custom");
-        masquerBtn.setOnAction(e -> moderer(a.id(), "MASQUEE"));
+        masquerBtn.setOnAction(e -> moderer(a.id(), "MASQUEE", masquerBtn));
         masquerBtn.setDisable("MASQUEE".equals(a.statut()));
 
         HBox boutons = new HBox(8, statutBadge, detailBtn, activerBtn, masquerBtn);
@@ -184,10 +202,20 @@ public class VueAdmin extends VBox {
         return ligne;
     }
 
-    private void moderer(Long id, String statut) {
+    private void moderer(Long id, String statut, Button bouton) {
+        bouton.setDisable(true);
         app.appeler(() -> {
             api.modererAnnonce(id, new StatutAnnonceRequest(statut));
             return null;
-        }, r -> charger());
+        },
+        r -> {
+            charger();
+            Affichage.succes("Annonce #".concat(String.valueOf(id))
+                    .concat(" : statut ").concat(statut).concat("."));
+        },
+        err -> {
+            bouton.setDisable(false);
+            app.gererErreur(err);
+        });
     }
 }

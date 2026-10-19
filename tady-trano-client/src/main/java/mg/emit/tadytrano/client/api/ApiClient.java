@@ -136,6 +136,24 @@ public class ApiClient {
         return getPagin("/api/favoris?page=" + page + "&taille=" + taille, FavoriResponse.class);
     }
 
+    /**
+     * Vrai si l'annonce figure parmi les favoris de l'utilisateur courant.
+     * Parcourt toutes les pages (pas seulement les 50 premieres).
+     */
+    public boolean estEnFavori(Long annonceId) {
+        int page = 0;
+        while (true) {
+            PageResponse<FavoriResponse> reponse = mesFavoris(page, 100);
+            if (reponse.contenu().stream().anyMatch(f -> annonceId.equals(f.annonceId()))) {
+                return true;
+            }
+            page++;
+            if (page >= reponse.totalPages()) {
+                return false;
+            }
+        }
+    }
+
     public void ajouterFavori(Long annonceId) {
         request("POST", "/api/favoris/" + annonceId, null);
     }

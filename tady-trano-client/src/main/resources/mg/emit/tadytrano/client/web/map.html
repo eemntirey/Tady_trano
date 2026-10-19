@@ -155,7 +155,11 @@
         }
 
         function setMarkers(annonces) {
-            if (!markersLayer) return;
+            if (!markersLayer) {
+                // Carte pas encore initialisee : on garde pour demarrerCarte().
+                window.__marqueursEnAttente = annonces;
+                return;
+            }
             markersLayer.clearLayers();
 
             if (!annonces || annonces.length === 0) return;
@@ -282,13 +286,48 @@
             }
         }
 
-        // Auto-initialisation au chargement de la page
-        window.addEventListener('load', function() {
-            initMap(-21.4536, 47.0858, 13);
-            if (window.javaBridge && window.javaBridge.onMapReady) {
-                window.javaBridge.onMapReady();
+        // Auto-initialisation au chargement de la page.
+        // Le pont javaBridge est injecte par JavaFX APRES window.load : on le
+        // detecte par sondage pour ne jamais perdre le signal de preparation.
+        function signalerPrete() {
+            try {
+                if (window.javaBridge && window.javaBridge.onMapReady) {
+                    window.javaBridge.onMapReady();
+                    return;
+                }
+            } catch (e) { /* pont pas encore visible, on reessaie */ }
+            if ((window.__tentativesPont || 0) < 50) {
+                window.__tentativesPont = (window.__tentativesPont || 0) + 1;
+                setTimeout(signalerPrete, 200);
             }
-        });
+        }
+
+        function demarrerCarte() {
+            if (window.__carteDemarree) {
+                signalerPrete();
+                return;
+            }
+            window.__carteDemarree = true;
+            initMap(-21.4536, 47.0858, 13);
+            // Si des marqueurs sont arrives avant l'init, on les applique.
+            if (window.__marqueursEnAttente) {
+                var enAttente = window.__marqueursEnAttente;
+                window.__marqueursEnAttente = null;
+                setMarkers(enAttente);
+            }
+            signalerPrete();
+        }
+
+        function isMapReady() {
+            return !!map && !!markersLayer;
+        }
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            demarrerCarte();
+        } else {
+            window.addEventListener('load', demarrerCarte);
+            document.addEventListener('DOMContentLoaded', demarrerCarte);
+        }
     </script>
 </body>
 </html>

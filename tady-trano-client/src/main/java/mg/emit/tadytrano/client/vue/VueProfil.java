@@ -8,7 +8,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import mg.emit.tadytrano.client.TadyTranoApp;
 import mg.emit.tadytrano.client.api.ApiClient;
-import mg.emit.tadytrano.client.dto.ProfilResponse;
 import mg.emit.tadytrano.client.dto.ProprietaireRequest;
 import mg.emit.tadytrano.client.dto.ProprietaireResponse;
 import mg.emit.tadytrano.client.dto.QuartierResponse;
@@ -23,6 +22,10 @@ public class VueProfil extends VBox {
     private final TadyTranoApp app;
     private final ApiClient api;
 
+    private final Label messageConnexion = new Label();
+    /** Guider un visiteur directement vers l'ecran de connexion. */
+    private final Button btnConnexion = new Button("Se connecter");
+    private final VBox infosCompte = new VBox(10);
     private final Label emailVal = new Label();
     private final Label nomVal = new Label();
     private final Label prenomVal = new Label();
@@ -42,6 +45,9 @@ public class VueProfil extends VBox {
     private final Label statutProprio = new Label();
 
     private boolean profilExiste = false;
+    /** Ville/quartier de l'annonce a restaurer apres le chargement asynchrone des referentiels. */
+    private Long villeCibleId;
+    private Long quartierCibleId;
 
     public VueProfil(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -59,9 +65,18 @@ public class VueProfil extends VBox {
         titre.setFont(Font.font("System", FontWeight.BOLD, 22));
 
         // Informations de base
-        VBox infosCompte = new VBox(10);
         infosCompte.setPadding(new Insets(15));
         infosCompte.getStyleClass().add("detail-box");
+
+        messageConnexion.setVisible(false);
+        messageConnexion.setManaged(false);
+        messageConnexion.setWrapText(true);
+        messageConnexion.getStyleClass().add("muted");
+
+        btnConnexion.getStyleClass().add("btn-info-custom");
+        btnConnexion.setOnAction(e -> app.ouvrir(new VueConnexion(app, api)));
+        btnConnexion.setVisible(false);
+        btnConnexion.managedProperty().bind(btnConnexion.visibleProperty());
 
         Label titreCompte = new Label("Informations personnelles");
         titreCompte.setFont(Font.font("System", FontWeight.BOLD, 16));
@@ -123,7 +138,8 @@ public class VueProfil extends VBox {
 
         sectionProprio.getChildren().addAll(titreProprio, gridProprio, btnEnregistrerProprio, statutProprio);
 
-        ScrollPane scroll = new ScrollPane(new VBox(15, titre, new Separator(), infosCompte, sectionProprio));
+        ScrollPane scroll = new ScrollPane(
+                new VBox(15, titre, messageConnexion, btnConnexion, new Separator(), infosCompte, sectionProprio));
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("scroll-transparent");
 
@@ -141,38 +157,54 @@ public class VueProfil extends VBox {
 
     private void charger() {
         if (!app.estConnecte()) {
+            messageConnexion.setText("Connectez-vous pour consulter et modifier votre profil.");
+            messageConnexion.setVisible(true);
+            messageConnexion.setManaged(true);
+            btnConnexion.setVisible(true);
+            infosCompte.setVisible(false);
+            infosCompte.setManaged(false);
+            sectionProprio.setVisible(false);
+            sectionProprio.setManaged(false);
             return;
         }
+        btnConnexion.setVisible(false);
 
-        // Villes
+        // Villes (la selection du quartier enregistre est restauree dans remplirProprio /
+        // chargerQuartiers des que les referentiels sont disponibles).
         app.appeler(api::villes, villes -> {
             comboVille.getItems().setAll(villes);
+            if (villeCibleId != null) {
+                comboVille.getItems().stream()
+                        .filter(v -> villeCibleId.equals(v.id()))
+                        .findFirst()
+                        .ifPresent(comboVille.getSelectionModel()::select);
+            }
         });
 
-        // Infos utilisateur depuis session ou profil
-        ProfilResponse profil = null;
-        try {
-            java.lang.reflect.Field field = app.getClass().getDeclaredField("session");
-            field.setAccessible(true);
-            mg.emit.tadytrano.client.api.Session sess = (mg.emit.tadytrano.client.api.Session) field.get(app);
-            profil = sess.profil();
-        } catch (Exception ignore) {
+        mg.emit.tadytrano.client.dto.ProfilResponse profil = app.profilCourant();
+        if (profil == null) {
+            return;
         }
+        emailVal.setText(profil.email());
+        nomVal.setText(profil.nom());
+        prenomVal.setText(profil.prenom());
+        roleVal.setText(profil.role());
 
-        if (profil != null) {
-            emailVal.setText(profil.email());
-            nomVal.setText(profil.nom());
-            prenomVal.setText(profil.prenom());
-            roleVal.setText(profil.role());
+        // Le serveur reserve /api/proprietaires au role strict PROPRIETAIRE,
+        // y compris pour les ADMIN : la section n'est visible que pour eux.
+        boolean estProprio = app.estProprietaire();
+        sectionProprio.setVisible(estProprio);
+        sectionProprio.setManaged(estProprio);
 
-            boolean estProprio = "PROPRIETAIRE".equals(profil.role()) || "ADMIN".equals(profil.role());
-            sectionProprio.setVisible(estProprio);
-            sectionProprio.setManaged(estProprio);
-
-            if (estProprio) {
-                // Tenter de charger le profil proprietaire
-                app.appeler(api::profilProprietaire, this::remplirProprio);
-            }
+        if (estProprio) {
+            app.appeler(api::profilProprietaire, this::remplirProprio, err -> {
+                if (err instanceof mg.emit.tadytrano.client.api.ErreurApi apiErr
+                        && (apiErr.statut() == 403 || apiErr.statut() == 404)) {
+                    // Pas encore de profil proprietaire : on reste en mode creation.
+                    return;
+                }
+                app.gererErreur(err);
+            });
         }
     }
 
@@ -190,26 +222,40 @@ public class VueProfil extends VBox {
         champEmailContact.setText(p.emailContact() != null ? p.emailContact() : "");
 
         if (p.quartier() != null && p.quartier().ville() != null) {
-            for (VilleResponse v : comboVille.getItems()) {
-                if (v.id().equals(p.quartier().ville().id())) {
-                    comboVille.getSelectionModel().select(v);
-                    chargerQuartiers();
-                    break;
-                }
+            // On memorise la cible : les villes/quartiers arrivent en asynchrone.
+            villeCibleId = p.quartier().ville().id();
+            quartierCibleId = p.quartier().id();
+            if (!comboVille.getItems().isEmpty()) {
+                // La selection declenche onAction -> chargerQuartiers avec le quartier cible.
+                comboVille.getItems().stream()
+                        .filter(v -> villeCibleId.equals(v.id()))
+                        .findFirst()
+                        .ifPresent(comboVille.getSelectionModel()::select);
             }
         }
     }
 
     private void chargerQuartiers() {
         VilleResponse v = comboVille.getValue();
-        if (v != null) {
-            app.appeler(() -> api.quartiers(v.id()), qList -> {
-                comboQuartier.getItems().setAll(qList);
-                if (!qList.isEmpty()) {
-                    comboQuartier.getSelectionModel().select(0);
-                }
-            });
+        if (v == null) {
+            return;
         }
+        final Long cible = quartierCibleId;
+        app.appeler(() -> api.quartiers(v.id()), qList -> {
+            comboQuartier.getItems().setAll(qList);
+            if (cible != null) {
+                // Restauration exacte du quartier deja enregistre.
+                qList.stream()
+                        .filter(q -> cible.equals(q.id()))
+                        .findFirst()
+                        .ifPresent(comboQuartier.getSelectionModel()::select);
+            } else if (!qList.isEmpty() && !profilExiste) {
+                // Creation uniquement : pas d'auto-selection qui pourrait ecraser
+                // silencieusement le quartier deja enregistre.
+                comboQuartier.getSelectionModel().select(0);
+            }
+            quartierCibleId = null;
+        });
     }
 
     private void enregistrerProprio() {
@@ -224,20 +270,35 @@ public class VueProfil extends VBox {
         String type = typeAgence.isSelected() ? "AGENCE" : "PARTICULIER";
         String agence = typeAgence.isSelected() ? champNomAgence.getText().trim() : null;
         String emailContact = champEmailContact.getText().trim().isBlank() ? null : champEmailContact.getText().trim();
-        Long quartierId = comboQuartier.getValue() != null ? comboQuartier.getValue().id() : null;
+        if (comboQuartier.getValue() == null) {
+            statutProprio.getStyleClass().setAll("label", "error-text");
+            statutProprio.setText("Sélectionnez un quartier (obligatoire).");
+            return;
+        }
+        Long quartierId = comboQuartier.getValue().id();
 
         ProprietaireRequest req = new ProprietaireRequest(type, agence, telephone, emailContact, quartierId);
 
+        btnEnregistrerProprio.setDisable(true); // anti double-clic
+        Runnable fin = () -> btnEnregistrerProprio.setDisable(false);
         if (!profilExiste) {
             app.appeler(() -> api.creerProfilProprietaire(req), resp -> {
                 profilExiste = true;
                 statutProprio.getStyleClass().setAll("label", "success-text");
                 statutProprio.setText("Profil propriétaire créé avec succès !");
+                fin.run();
+            }, err -> {
+                app.gererErreur(err);
+                fin.run();
             });
         } else {
             app.appeler(() -> api.modifierProfilProprietaire(req), resp -> {
                 statutProprio.getStyleClass().setAll("label", "success-text");
                 statutProprio.setText("Profil propriétaire mis à jour !");
+                fin.run();
+            }, err -> {
+                app.gererErreur(err);
+                fin.run();
             });
         }
     }

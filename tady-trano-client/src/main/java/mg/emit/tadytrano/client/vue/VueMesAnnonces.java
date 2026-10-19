@@ -61,7 +61,16 @@ public class VueMesAnnonces extends VBox {
 
         Button nouvelleAnnonce = new Button("+ Publier une annonce");
         nouvelleAnnonce.getStyleClass().add("btn-success-custom");
-        nouvelleAnnonce.setOnAction(e -> ouvrirFormulaire(null));
+        // Le serveur exige le role PROPRIETAIRE pour POST /api/annonces :
+        // on bloque tot avec un message clair au lieu du 403.
+        nouvelleAnnonce.setOnAction(e -> {
+            if (!app.estProprietaire()) {
+                Affichage.erreur(new RuntimeException(
+                        "La publication est réservée aux comptes Propriétaire."));
+                return;
+            }
+            ouvrirFormulaire(null);
+        });
 
         enTete.getChildren().addAll(titre, espace, nouvelleAnnonce);
 
@@ -97,6 +106,12 @@ public class VueMesAnnonces extends VBox {
             listeAnnonces.getChildren().clear();
             return;
         }
+        if (!app.estProprietaire()) {
+            messageVide.setText("L'espace « Mes annonces » est réservé aux comptes Propriétaire.");
+            messageVide.setVisible(true);
+            listeAnnonces.getChildren().clear();
+            return;
+        }
 
         final int pageDemandee = page;
         final int gen = ++generation;
@@ -116,6 +131,15 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void afficherResultats(PageResponse<AnnonceResumeResponse> reponse) {
+        // Apres une suppression : si la page courante n'existe plus, revenir a la derniere valide.
+        if (reponse.contenu().isEmpty() && page > 0) {
+            int dernierePage = Math.max(0, reponse.totalPages() - 1);
+            if (dernierePage != page) {
+                page = dernierePage;
+                charger();
+                return;
+            }
+        }
         listeAnnonces.getChildren().clear();
         totalPages = reponse.totalPages();
         pageLabel.setText("Page " + (totalPages == 0 ? 0 : page + 1) + " / " + totalPages + " (" + reponse.totalElements() + " annonces)");
@@ -172,14 +196,14 @@ public class VueMesAnnonces extends VBox {
         photosBtn.setOnAction(e -> ouvrirGestionPhotos(a.id()));
 
         Button statutBtn = new Button("Statut");
-        statutBtn.setOnAction(e -> ouvrirChangementStatut(a));
+        statutBtn.setOnAction(e -> ouvrirChangementStatut(a, statutBtn));
 
         Button modifierBtn = new Button("Modifier");
         modifierBtn.setOnAction(e -> ouvrirFormulaire(a.id()));
 
         Button supprimerBtn = new Button("Supprimer");
         supprimerBtn.getStyleClass().add("btn-danger-custom");
-        supprimerBtn.setOnAction(e -> confirmerSuppression(a));
+        supprimerBtn.setOnAction(e -> confirmerSuppression(a, supprimerBtn));
 
         HBox boutons = new HBox(8, statutBadge, photosBtn, statutBtn, modifierBtn, supprimerBtn);
         boutons.setAlignment(Pos.CENTER_RIGHT);
@@ -188,7 +212,7 @@ public class VueMesAnnonces extends VBox {
         return ligne;
     }
 
-    private void ouvrirChangementStatut(AnnonceResumeResponse a) {
+    private void ouvrirChangementStatut(AnnonceResumeResponse a, Button bouton) {
         ChoiceDialog<String> dialog = new ChoiceDialog<>(a.statut(), "ACTIVE", "LOUEE", "MASQUEE");
         dialog.setTitle("Statut de l'annonce");
         dialog.setHeaderText("Modifier le statut de : " + a.titre());
@@ -196,14 +220,23 @@ public class VueMesAnnonces extends VBox {
 
         Optional<String> res = dialog.showAndWait();
         res.ifPresent(nouveauStatut -> {
+            bouton.setDisable(true);
             app.appeler(() -> {
                 api.changerStatutAnnonce(a.id(), new StatutAnnonceRequest(nouveauStatut));
                 return null;
-            }, r -> charger());
+            },
+            r -> {
+                charger();
+                Affichage.succes("Statut mis à jour : " + nouveauStatut + ".");
+            },
+            err -> {
+                bouton.setDisable(false);
+                app.gererErreur(err);
+            });
         });
     }
 
-    private void confirmerSuppression(AnnonceResumeResponse a) {
+    private void confirmerSuppression(AnnonceResumeResponse a, Button bouton) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Confirmation de suppression");
         alert.setHeaderText("Supprimer l'annonce : " + a.titre() + " ?");
@@ -211,14 +244,29 @@ public class VueMesAnnonces extends VBox {
 
         Optional<ButtonType> res = alert.showAndWait();
         if (res.isPresent() && res.get() == ButtonType.OK) {
+            bouton.setDisable(true);
             app.appeler(() -> {
                 api.supprimerAnnonce(a.id());
                 return null;
-            }, r -> charger());
+            },
+            r -> {
+                charger();
+                Affichage.succes("Annonce supprimée.");
+            },
+            err -> {
+                bouton.setDisable(false);
+                app.gererErreur(err);
+            });
         }
     }
 
     private void ouvrirFormulaire(Long idModification) {
+        // Le menu n'est pas propose aux non-proprietaires ; garde interne aussi.
+        if (!app.estProprietaire()) {
+            Affichage.erreur(new IllegalArgumentException(
+                    "L'espace « Mes annonces » est réservé aux comptes Propriétaire."));
+            return;
+        }
         Dialog<AnnonceRequest> dialog = new Dialog<>();
         dialog.setTitle(idModification == null ? "Publier une nouvelle annonce" : "Modifier l'annonce");
         dialog.setHeaderText(idModification == null ? "Renseignez les détails du bien à louer" : "Mise à jour des informations");
@@ -268,25 +316,20 @@ public class VueMesAnnonces extends VBox {
         grid.add(new Label("Longitude GPS :"), 0, 9);
         grid.add(lngF, 1, 9);
 
-        // Chargement du referentiel
-        app.appeler(api::typesLocation, typeCombo.getItems()::setAll);
-        app.appeler(api::villes, villes -> {
-            villeCombo.getItems().setAll(villes);
-            if (!villes.isEmpty()) {
-                villeCombo.getSelectionModel().select(0);
-            }
-        });
+        // Quartier a preselectionner apres chargement (modification uniquement).
+        final Long[] quartierCible = { null };
+        // Garde : setOnAction peut se declencher lors d'une selection programmatique ;
+        // on ne recharge que si l'utilisateur change vraiment de ville.
+        final Long[] villeAffichee = { null };
 
         villeCombo.setOnAction(e -> {
-            VilleResponse v = villeCombo.getValue();
-            if (v != null) {
-                app.appeler(() -> api.quartiers(v.id()), quartiers -> {
-                    quartierCombo.getItems().setAll(quartiers);
-                    if (!quartiers.isEmpty()) {
-                        quartierCombo.getSelectionModel().select(0);
-                    }
-                });
+            VilleResponse selection = villeCombo.getValue();
+            Long selectionId = selection == null ? null : selection.id();
+            if (villeAffichee[0] != null && villeAffichee[0].equals(selectionId)) {
+                return;
             }
+            villeAffichee[0] = selectionId;
+            chargerQuartiers(villeCombo, quartierCombo, quartierCible[0]);
         });
 
         quartierCombo.setOnAction(e -> {
@@ -297,7 +340,8 @@ public class VueMesAnnonces extends VBox {
             }
         });
 
-        // Prefill si modification
+        // Prefill si modification : on charge d'abord l'annonce, puis les referentiels
+        // en preslectionnant type / ville / quartier de l'annonce existante.
         if (idModification != null) {
             app.appeler(() -> api.detail(idModification), d -> {
                 titreF.setText(d.titre());
@@ -307,7 +351,14 @@ public class VueMesAnnonces extends VBox {
                 if (d.nbPieces() != null) piecesF.getValueFactory().setValue(d.nbPieces());
                 if (d.latitude() != null) latF.setText(String.valueOf(d.latitude()));
                 if (d.longitude() != null) lngF.setText(String.valueOf(d.longitude()));
+                quartierCible[0] = d.quartier() != null ? d.quartier().id() : null;
+                chargerReferentiels(typeCombo, villeCombo, quartierCombo,
+                        d.typeLocation() != null ? d.typeLocation().id() : null,
+                        d.quartier() != null && d.quartier().ville() != null
+                                ? d.quartier().ville().id() : null);
             });
+        } else {
+            chargerReferentiels(typeCombo, villeCombo, quartierCombo, null, null);
         }
 
         Label erreurSaisie = new Label();
@@ -317,11 +368,17 @@ public class VueMesAnnonces extends VBox {
         dialog.getDialogPane().setContent(grid);
 
         Button boutonEnregistrer = (Button) dialog.getDialogPane().lookupButton(enregistrerType);
+        final boolean[] enCours = { false };
         boutonEnregistrer.addEventFilter(ActionEvent.ACTION, event -> {
+            if (enCours[0]) {
+                event.consume(); // anti double-clic : une seule soumission par ouverture
+                return;
+            }
             try {
                 construireDemande(titreF, descF, typeCombo, quartierCombo,
                         prixF, surfaceF, piecesF, latF, lngF);
                 erreurSaisie.setText("");
+                enCours[0] = true;
             } catch (IllegalArgumentException ex) {
                 erreurSaisie.setText(ex.getMessage());
                 event.consume();
@@ -339,9 +396,15 @@ public class VueMesAnnonces extends VBox {
         Optional<AnnonceRequest> resultat = dialog.showAndWait();
         resultat.ifPresent(req -> {
             if (idModification == null) {
-                app.appeler(() -> api.creerAnnonce(req), r -> charger());
+                app.appeler(() -> api.creerAnnonce(req), r -> {
+                    charger();
+                    Affichage.succes("Annonce publiée.");
+                });
             } else {
-                app.appeler(() -> api.modifierAnnonce(idModification, req), r -> charger());
+                app.appeler(() -> api.modifierAnnonce(idModification, req), r -> {
+                    charger();
+                    Affichage.succes("Annonce mise à jour.");
+                });
             }
         });
     }
@@ -426,6 +489,53 @@ public class VueMesAnnonces extends VBox {
         }
     }
 
+    /** Charge types + villes et preslectionne ceux de l'annonce (null = creation). */
+    private void chargerReferentiels(ComboBox<TypeLocationResponse> typeCombo,
+                                     ComboBox<VilleResponse> villeCombo,
+                                     ComboBox<QuartierResponse> quartierCombo,
+                                     Long typeId, Long villeId) {
+        app.appeler(api::typesLocation, types -> {
+            typeCombo.getItems().setAll(types);
+            if (typeId != null) {
+                types.stream().filter(t -> typeId.equals(t.id())).findFirst()
+                        .ifPresent(typeCombo.getSelectionModel()::select);
+            }
+        });
+        app.appeler(api::villes, villes -> {
+            villeCombo.getItems().setAll(villes);
+            if (villeId != null) {
+                // La selection programmatique ne declenche pas toujours onAction :
+                // on force le chargement des quartiers avec le quartier cible.
+                villes.stream().filter(v -> villeId.equals(v.id())).findFirst()
+                        .ifPresent(v -> {
+                            villeCombo.getSelectionModel().select(v);
+                            villeAffichee[0] = v.id();
+                            chargerQuartiers(villeCombo, quartierCombo, quartierCible[0]);
+                        });
+            } else if (!villes.isEmpty()) {
+                villeCombo.getSelectionModel().select(0);
+            }
+        });
+    }
+
+    private void chargerQuartiers(ComboBox<VilleResponse> villeCombo,
+                                  ComboBox<QuartierResponse> quartierCombo,
+                                  Long quartierId) {
+        VilleResponse v = villeCombo.getValue();
+        if (v == null) {
+            return;
+        }
+        app.appeler(() -> api.quartiers(v.id()), quartiers -> {
+            quartierCombo.getItems().setAll(quartiers);
+            if (quartierId != null) {
+                quartiers.stream().filter(q -> quartierId.equals(q.id())).findFirst()
+                        .ifPresent(quartierCombo.getSelectionModel()::select);
+            } else if (!quartiers.isEmpty()) {
+                quartierCombo.getSelectionModel().select(0);
+            }
+        });
+    }
+
     private void ouvrirGestionPhotos(Long annonceId) {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Gestion des photos de l'annonce #" + annonceId);
@@ -443,15 +553,16 @@ public class VueMesAnnonces extends VBox {
         CheckBox principaleCb = new CheckBox("Principale");
         Button ajouterBtn = new Button("Ajouter");
         ajouterBtn.getStyleClass().add("btn-success-custom");
+        Label retour = new Label();
 
         ajoutBox.getChildren().addAll(urlF, principaleCb, ajouterBtn);
-
         VBox listePhotos = new VBox(8);
         ScrollPane scroll = new ScrollPane(listePhotos);
         scroll.setPrefHeight(300);
         scroll.setFitToWidth(true);
 
-        Runnable rechargerPhotos = () -> {
+        Runnable[] rechargerPhotos = new Runnable[1];
+        rechargerPhotos[0] = () -> {
             app.appeler(() -> api.photos(annonceId), photos -> {
                 listePhotos.getChildren().clear();
                 if (photos.isEmpty()) {
@@ -473,10 +584,23 @@ public class VueMesAnnonces extends VBox {
 
                     Button delBtn = new Button("✕");
                     delBtn.getStyleClass().add("btn-danger-custom");
-                    delBtn.setOnAction(ev -> app.appeler(() -> {
-                        api.supprimerPhoto(annonceId, p.id());
-                        return null;
-                    }, ok -> charger()));
+                    delBtn.setOnAction(ev -> {
+                        delBtn.setDisable(true);
+                        app.appeler(() -> {
+                            api.supprimerPhoto(annonceId, p.id());
+                            return null;
+                        },
+                        ok -> {
+                            // Rafraichir la liste des photos du dialogue ET la liste des annonces.
+                            rechargerPhotos[0].run();
+                            charger();
+                            messageRetour(retour, "Photo supprimée.", true);
+                        },
+                        err -> {
+                            delBtn.setDisable(false);
+                            app.gererErreur(err);
+                        });
+                    });
 
                     ligne.getChildren().addAll(iv, urlLbl, badge, delBtn);
                     listePhotos.getChildren().add(ligne);
@@ -485,20 +609,38 @@ public class VueMesAnnonces extends VBox {
         };
 
         ajouterBtn.setOnAction(e -> {
-            String u = urlF.getText().trim();
-            if (!u.isBlank()) {
-                app.appeler(() -> api.ajouterPhoto(annonceId, new PhotoRequest(u, principaleCb.isSelected())), ok -> {
-                    urlF.clear();
-                    principaleCb.setSelected(false);
-                    rechargerPhotos.run();
-                    charger();
-                });
+            String u = urlF.getText() == null ? "" : urlF.getText().trim();
+            if (u.isBlank()) {
+                messageRetour(retour, "Renseignez l'URL de la photo avant de cliquer sur Ajouter.", false);
+                return;
             }
+            messageRetour(retour, "", false);
+            ajouterBtn.setDisable(true);
+            app.appeler(() -> api.ajouterPhoto(annonceId, new PhotoRequest(u, principaleCb.isSelected())),
+                    ok -> {
+                        urlF.clear();
+                        principaleCb.setSelected(false);
+                        rechargerPhotos[0].run();
+                        charger();
+                        ajouterBtn.setDisable(false);
+                        messageRetour(retour, "Photo ajoutée.", true);
+                    },
+                    err -> {
+                        app.gererErreur(err);
+                        ajouterBtn.setDisable(false);
+                        messageRetour(retour, "Échec de l'ajout de la photo.", false);
+                    });
         });
 
-        rechargerPhotos.run();
-        contenu.getChildren().addAll(ajoutBox, new Separator(), scroll);
+        rechargerPhotos[0].run();
+        contenu.getChildren().addAll(ajoutBox, retour, new Separator(), scroll);
         dialog.getDialogPane().setContent(contenu);
         dialog.showAndWait();
+    }
+
+    /** Retour visuel dans un dialogue : succes en vert, erreur en rouge. */
+    private static void messageRetour(Label label, String texte, boolean succes) {
+        label.setText(texte);
+        label.setStyle(succes ? "-fx-text-fill: #15803d;" : "-fx-text-fill: #b91c1c;");
     }
 }

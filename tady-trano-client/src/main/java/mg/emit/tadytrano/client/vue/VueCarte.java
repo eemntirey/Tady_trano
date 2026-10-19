@@ -82,6 +82,11 @@ public class VueCarte extends VBox {
             List<AnnonceResumeResponse> liste = reponse.contenu();
             carteView.afficherAnnonces(liste);
             infoLabel.setText(liste.size() + " annonce(s) positionnée(s) sur la carte. Cliquez sur un repère pour voir les détails.");
+        },
+        err -> {
+            // Laisser un retour visible sur la carte plutot qu'un libelle fige.
+            infoLabel.setText("Impossible de charger les annonces sur la carte : "
+                    + (err.getMessage() == null ? "erreur inattendue" : err.getMessage()));
         });
     }
 }

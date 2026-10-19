@@ -4,6 +4,8 @@ import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -74,10 +76,20 @@ public class TadyTranoApp extends Application {
         favoris.setOnAction(e -> ouvrir(new VueFavoris(this, api)));
 
         Button mesAnnonces = new Button("Mes annonces");
-        mesAnnonces.setOnAction(e -> ouvrir(new VueMesAnnonces(this, api)));
+        mesAnnonces.setOnAction(e -> ouvrirMesAnnonces());
+        // Les routes /api/proprietaires exigent le role PROPRIETAIRE (meme les ADMIN sont refusees).
+        mesAnnonces.visibleProperty().bind(session.proprietaireProperty());
+        mesAnnonces.managedProperty().bind(mesAnnonces.visibleProperty());
 
         Button profil = new Button("Profil");
         profil.setOnAction(e -> ouvrir(new VueProfil(this, api)));
+
+        // Visiteur sans session : retour explicite vers l'ecran de connexion.
+        Button connexion = new Button("Connexion");
+        connexion.setOnAction(e -> ouvrir(new VueConnexion(this, api)));
+        connexion.visibleProperty().bind(session.connecteProperty().not());
+        connexion.managedProperty().bind(connexion.visibleProperty());
+        connexion.getStyleClass().addAll("nav-button", "nav-button-danger");
 
         Button admin = new Button("Moderation");
         admin.setOnAction(e -> ouvrir(new VueAdmin(this, api)));
@@ -109,13 +121,24 @@ public class TadyTranoApp extends Application {
         Label marque = new Label("Tady Trano");
         marque.getStyleClass().add("brand-title");
 
+        // Indicateur global : visible tant qu'un appel API est en vol
+        // (Travailleur) — l'utilisateur sait que le bouton a bien reagi.
+        ProgressIndicator chargement = new ProgressIndicator();
+        chargement.setPrefSize(20, 20);
+        chargement.setMaxSize(20, 20);
+        chargement.setProgress(-1);
+        chargement.visibleProperty().bind(Travailleur.occupeProperty());
+        chargement.managedProperty().bind(chargement.visibleProperty());
+        chargement.setTooltip(new Tooltip("Appel API en cours..."));
+
         utilisateur.getStyleClass().add("user-pill");
         utilisateur.visibleProperty().bind(utilisateur.textProperty().isNotEmpty());
         utilisateur.managedProperty().bind(utilisateur.visibleProperty());
 
         Region poussiere = new Region();
         HBox.setHgrow(poussiere, Priority.ALWAYS);
-        HBox barre = new HBox(10, marque, recherche, carte, favoris, mesAnnonces, profil, admin, poussiere, utilisateur, theme, deconnexion);
+        HBox barre = new HBox(10, marque, recherche, carte, favoris, mesAnnonces, profil, connexion,
+                admin, poussiere, chargement, utilisateur, theme, deconnexion);
         barre.getStyleClass().add("app-header");
         barre.setPrefHeight(48);
         return barre;
@@ -168,9 +191,35 @@ public class TadyTranoApp extends Application {
         return session.estConnecte();
     }
 
+    /** Profil de l'utilisateur connecte, ou null. */
+    public mg.emit.tadytrano.client.dto.ProfilResponse profilCourant() {
+        return session.profil();
+    }
+
+    /** Vrai si le compte courant a le role strict PROPRIETAIRE. */
+    public boolean estProprietaire() {
+        return session.estProprietaire();
+    }
+
+    /** Vrai si le compte courant a le role ADMIN. */
+    public boolean estAdmin() {
+        return session.estAdmin();
+    }
+
     /** Ouvre le detail d'une annonce depuis n'importe quelle liste. */
     public void ouvrirDetail(long annonceId, Runnable retour) {
         ouvrir(new VueDetail(this, api, annonceId, retour));
+    }
+
+    /** Espace proprietaire : refuse poliment les roles non autorises au lieu du 403 serveur. */
+    public void ouvrirMesAnnonces() {
+        if (!estProprietaire()) {
+            Affichage.erreur(new RuntimeException(estConnecte()
+                    ? "L'espace « Mes annonces » est réservé aux comptes Propriétaire."
+                    : "Connectez-vous avec un compte Propriétaire pour gérer vos annonces."));
+            return;
+        }
+        ouvrir(new VueMesAnnonces(this, api));
     }
 
     /** Tache API avec erreur affichee automatiquement. */
