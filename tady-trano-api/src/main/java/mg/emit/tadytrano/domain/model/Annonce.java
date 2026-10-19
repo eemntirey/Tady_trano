@@ -69,6 +69,12 @@ public class Annonce {
     @Column(nullable = false, length = 20)
     private StatutAnnonce statut = StatutAnnonce.ACTIVE;
 
+    /**
+     * Distinguishes moderation hiding from a voluntary owner hiding action.
+     */
+    @Column(name = "masquee_par_admin", nullable = false)
+    private boolean masqueeParAdmin = false;
+
     @Column(name = "date_publication", nullable = false, updatable = false)
     private LocalDateTime datePublication;
 

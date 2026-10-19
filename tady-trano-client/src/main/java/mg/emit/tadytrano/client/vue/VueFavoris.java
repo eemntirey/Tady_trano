@@ -136,9 +136,12 @@ public class VueFavoris extends VBox {
         card.setPrefWidth(260);
         card.getStyleClass().add("list-row");
 
+        boolean louee = "LOUEE".equals(a.statut());
         ImageView image = Affichage.vignette(a.urlPhotoPrincipale(), 236, 140);
-        image.getStyleClass().add("thumb-clickable");
-        image.setOnMouseClicked(e -> app.ouvrirDetail(a.id(), this::charger));
+        if (!louee) {
+            image.getStyleClass().add("thumb-clickable");
+            image.setOnMouseClicked(e -> app.ouvrirDetail(a.id(), this::charger));
+        }
 
         Label titre = new Label(a.titre());
         titre.setFont(Font.font("System", FontWeight.BOLD, 14));
@@ -154,9 +157,17 @@ public class VueFavoris extends VBox {
         prix.setFont(Font.font("System", FontWeight.BOLD, 15));
         prix.getStyleClass().add("card-price");
 
+        Label statut = new Label("LOUÉE");
+        statut.getStyleClass().add("badge-statut-louee");
+
         Button detailBtn = new Button("Voir détail");
         detailBtn.getStyleClass().add("btn-info-custom");
-        detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), this::charger));
+        detailBtn.setDisable(louee);
+        if (louee) {
+            detailBtn.setTooltip(new javafx.scene.control.Tooltip("Cette annonce est louée et n'est plus disponible."));
+        } else {
+            detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), this::charger));
+        }
 
         Button retirerBtn = new Button("Retirer");
         retirerBtn.getStyleClass().add("btn-danger-custom");
@@ -168,7 +179,11 @@ public class VueFavoris extends VBox {
         HBox actions = new HBox(8, detailBtn, retirerBtn);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        card.getChildren().addAll(image, titre, locLabel, prix, actions);
+        if (louee) {
+            card.getChildren().addAll(image, titre, statut, locLabel, prix, actions);
+        } else {
+            card.getChildren().addAll(image, titre, locLabel, prix, actions);
+        }
         return card;
     }
 }

@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -141,6 +142,12 @@ public class AnnonceService {
     @Transactional
     public void changerStatut(String email, Long id, StatutAnnonceRequest demande) {
         Annonce annonce = annonceDeProprietaire(email, id);
+        if (annonce.isMasqueeParAdmin()) {
+            throw new ApiException(HttpStatus.FORBIDDEN,
+                    "Cette annonce est masquee par la moderation ; contactez l'administration.");
+        }
+        // Un proprietaire peut masquer/reactiver sa propre annonce, mais jamais lever
+        // le verrou pose par une moderation administrative.
         annonce.setStatut(demande.statut());
         annonceRepository.save(annonce);
     }
@@ -154,6 +161,7 @@ public class AnnonceService {
         Annonce annonce = annonceRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Annonce introuvable"));
         annonce.setStatut(demande.statut());
+        annonce.setMasqueeParAdmin(demande.statut() == StatutAnnonce.MASQUEE);
         annonceRepository.save(annonce);
     }
 
@@ -227,23 +235,28 @@ public class AnnonceService {
     @Transactional
     public PhotoResponse ajouterPhoto(String email, Long annonceId, PhotoRequest demande) {
         Annonce annonce = annonceDeProprietaire(email, annonceId);
-
-        if (photoRepository.countByAnnonceId(annonceId) >= MAX_PHOTOS_PAR_ANNONCE) {
+        List<Photo> existantes = photoRepository.findByAnnonceIdOrderByOrdreAsc(annonceId);
+        if (existantes.size() >= MAX_PHOTOS_PAR_ANNONCE) {
             throw new ApiException(HttpStatus.BAD_REQUEST,
                     "Nombre maximum de photos atteint (" + MAX_PHOTOS_PAR_ANNONCE + ")");
         }
 
+        boolean aUnePrincipale = existantes.stream().anyMatch(Photo::isPrincipale);
+        if (demande.principale()) {
+            existantes.forEach(p -> p.setPrincipale(false));
+            photoRepository.saveAll(existantes);
+        } else if (!existantes.isEmpty() && !aUnePrincipale) {
+            existantes.get(0).setPrincipale(true);
+            photoRepository.saveAll(existantes);
+        }
+
+        int ordreSuivant = existantes.stream().mapToInt(Photo::getOrdre).max().orElse(0) + 1;
         Photo photo = new Photo();
         photo.setAnnonce(annonce);
         photo.setUrl(demande.url());
-        photo.setPrincipale(demande.principale());
-        photo.setOrdre((int) photoRepository.countByAnnonceId(annonceId) + 1);
-
-        Photo sauvegardee = photoRepository.save(photo);
-        if (photo.isPrincipale()) {
-            retirerAnciennePrincipale(annonceId, sauvegardee.getId());
-        }
-        return PhotoResponse.depuis(sauvegardee);
+        photo.setPrincipale(demande.principale() || existantes.isEmpty());
+        photo.setOrdre(ordreSuivant);
+        return PhotoResponse.depuis(photoRepository.save(photo));
     }
 
     @Transactional
@@ -252,7 +265,21 @@ public class AnnonceService {
         Photo photo = photoRepository.findById(photoId)
                 .filter(p -> p.getAnnonce().getId().equals(annonceId))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Photo introuvable"));
+        boolean etaitPrincipale = photo.isPrincipale();
         photoRepository.delete(photo);
+        photoRepository.flush();
+        List<Photo> restantes = photoRepository.findByAnnonceIdOrderByOrdreAsc(annonceId);
+        Photo principaleExistante = restantes.stream().filter(Photo::isPrincipale).findFirst().orElse(null);
+        if (etaitPrincipale || principaleExistante == null) {
+            principaleExistante = restantes.isEmpty() ? null : restantes.get(0);
+        }
+        for (int i = 0; i < restantes.size(); i++) {
+            Photo restante = restantes.get(i);
+            restante.setOrdre(i + 1);
+            restante.setPrincipale(principaleExistante != null
+                    && restante.getId().equals(principaleExistante.getId()));
+        }
+        photoRepository.saveAll(restantes);
     }
 
     // ------------------------------------------------------------------
@@ -261,7 +288,9 @@ public class AnnonceService {
 
     @Transactional
     public void ajouterFavori(Long utilisateurId, Long annonceId) {
-        if (!annonceRepository.existsById(annonceId)) {
+        Annonce annonce = annonceRepository.findById(annonceId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Annonce introuvable"));
+        if (annonce.getStatut() != StatutAnnonce.ACTIVE) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Annonce introuvable");
         }
         if (favoriRepository.findByUtilisateurIdAndAnnonceId(utilisateurId, annonceId).isPresent()) {
@@ -282,8 +311,11 @@ public class AnnonceService {
 
     @Transactional(readOnly = true)
     public PageResponse<FavoriResponse> mesFavoris(Long utilisateurId, int page, int taille) {
-        Page<Favori> favoris = favoriRepository.findByUtilisateurIdOrderByDateAjoutDesc(
-                utilisateurId, PageRequest.of(Math.max(page, 0), Math.min(Math.max(taille, 1), TAILLE_MAX_PAGE)));
+        // Les favoris restent consultables quand un bien passe a LOUEE,
+        // mais une annonce masquee par la moderation n'est pas exposee.
+        Page<Favori> favoris = favoriRepository.findByUtilisateurIdAndAnnonce_StatutInOrderByDateAjoutDesc(
+                utilisateurId, List.of(StatutAnnonce.ACTIVE, StatutAnnonce.LOUEE),
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(taille, 1), TAILLE_MAX_PAGE)));
 
         List<Favori> contenus = favoris.getContent();
         Map<Long, Annonce> annonces = annonceRepository.findAllById(
@@ -346,10 +378,19 @@ public class AnnonceService {
         if (annonceIds.isEmpty()) {
             return Map.of();
         }
-        List<Photo> photos = photoRepository.findByAnnonceIdIn(annonceIds);
-        return photos.stream()
-                .filter(Photo::isPrincipale)
-                .collect(Collectors.toMap(p -> p.getAnnonce().getId(), Photo::getUrl, (a, b) -> a));
+        List<Photo> photos = photoRepository.findByAnnonceIdIn(annonceIds).stream()
+                .sorted(Comparator.comparingInt(Photo::getOrdre).thenComparing(Photo::getId))
+                .toList();
+        Map<Long, String> resultat = new java.util.HashMap<>();
+        for (Photo photo : photos) {
+            if (photo.isPrincipale()) {
+                resultat.putIfAbsent(photo.getAnnonce().getId(), photo.getUrl());
+            }
+        }
+        for (Photo photo : photos) {
+            resultat.putIfAbsent(photo.getAnnonce().getId(), photo.getUrl());
+        }
+        return resultat;
     }
 
     private boolean estProprietaireOuAdmin(Annonce annonce) {

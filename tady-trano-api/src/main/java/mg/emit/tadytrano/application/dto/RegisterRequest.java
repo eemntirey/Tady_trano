@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import mg.emit.tadytrano.domain.model.Role;
 
+import java.util.Locale;
+
 public record RegisterRequest(
         @NotBlank @Email @Size(max = 190) String email,
         @NotBlank @Size(min = 8, max = 72) String motDePasse,
@@ -13,4 +15,9 @@ public record RegisterRequest(
         @NotBlank @Size(max = 50) String prenom,
         @NotNull Role role
 ) {
+    public RegisterRequest {
+        if (email != null) {
+            email = email.trim().toLowerCase(Locale.ROOT);
+        }
+    }
 }

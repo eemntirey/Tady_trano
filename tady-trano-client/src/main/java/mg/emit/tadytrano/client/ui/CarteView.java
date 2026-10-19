@@ -79,9 +79,13 @@ public class CarteView extends StackPane {
             this.labelAttente = label;
             return;
         }
-        if (lat != null && lng != null) {
-            String lbl = label != null ? label.replace("'", "\\'") : "";
-            webEngine.executeScript("setUserLocation(" + lat + ", " + lng + ", '" + lbl + "');");
+        if (lat != null && lng != null
+                && Double.isFinite(lat) && Double.isFinite(lng)
+                && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            String lbl = ApiClient.serialiser(label == null ? "" : label)
+                    .replace(String.valueOf((char) 0x2028), "\\u2028")
+                    .replace(String.valueOf((char) 0x2029), "\\u2029");
+            webEngine.executeScript("setUserLocation(" + lat + ", " + lng + ", " + lbl + ");");
         }
     }
 

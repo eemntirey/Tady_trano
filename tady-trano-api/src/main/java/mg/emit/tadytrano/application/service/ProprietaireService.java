@@ -31,7 +31,7 @@ public class ProprietaireService {
 
     @Transactional
     public ProprietaireResponse creer(String email, ProprietaireRequest demande) {
-        Utilisateur utilisateur = utilisateurRepository.findByEmail(email)
+        Utilisateur utilisateur = utilisateurRepository.findByEmailIgnoreCase(email == null ? null : email.trim())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Utilisateur introuvable"));
 
         if (utilisateur.getRole() != Role.PROPRIETAIRE) {
@@ -82,7 +82,7 @@ public class ProprietaireService {
      */
     @Transactional(readOnly = true)
     public Proprietaire parEmail(String email) {
-        Utilisateur utilisateur = utilisateurRepository.findByEmail(email)
+        Utilisateur utilisateur = utilisateurRepository.findByEmailIgnoreCase(email == null ? null : email.trim())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Utilisateur introuvable"));
         return proprietaireRepository.findByUtilisateurId(utilisateur.getId())
                 .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN,

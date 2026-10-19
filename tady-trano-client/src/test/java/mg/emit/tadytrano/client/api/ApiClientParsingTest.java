@@ -113,6 +113,28 @@ class ApiClientParsingTest {
     }
 
     @Test
+    void parseErreurProblemDetailDeLApi() {
+        String conflit = """
+                {"type":"about:blank","title":"Conflict","status":409,
+                 "detail":"Un compte existe deja avec cet email","erreurs":[]}
+                """;
+        assertEquals("Un compte existe deja avec cet email",
+                ApiClient.messageDerreur(conflit, 409));
+    }
+
+    @Test
+    void parseErreursDeValidationProblemDetail() {
+        String validation = """
+                {"title":"Bad Request","status":400,"detail":"Donnees invalides",
+                 "erreurs":["prix : doit etre strictement positif"]}
+                """;
+        assertEquals("prix : doit etre strictement positif",
+                ApiClient.messageDerreur(validation, 400));
+        assertEquals("prix : doit etre strictement positif",
+                ApiClient.messageDerreur("{\"erreurs\":[\"prix : doit etre strictement positif\"]}", 400));
+    }
+
+    @Test
     void listeNonVideAttendue() {
         // garde-fou : la methode getList doit pouvoir reconstruire une liste de records
         String json = "[{\"id\":1,\"nom\":\"Antananarivo\"},{\"id\":2,\"nom\":\"Toamasina\"}]";

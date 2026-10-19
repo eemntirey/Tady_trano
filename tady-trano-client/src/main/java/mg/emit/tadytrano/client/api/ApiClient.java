@@ -255,19 +255,31 @@ public class ApiClient {
         return corpsReponse;
     }
 
-    private static String messageDerreur(String json, int statut) {
-        if (json.isBlank()) {
+    static String messageDerreur(String json, int statut) {
+        if (json == null || json.isBlank()) {
             return "Erreur " + statut;
         }
         try {
             var noeud = MAPPER.readTree(json);
-            var message = noeud.get("message");
-            if (message != null && !message.isNull()) {
-                return message.asText();
+            // Pour une erreur de validation, preferer le detail du champ au detail generique.
+            for (String cle : List.of("erreurs", "errors")) {
+                var erreurs = noeud.get(cle);
+                if (erreurs != null && erreurs.isArray() && erreurs.size() > 0) {
+                    var premiere = erreurs.get(0);
+                    if (!premiere.isNull()) {
+                        if (premiere.isTextual()) return premiere.asText();
+                        var detailErreur = premiere.get("defaultMessage");
+                        if (detailErreur == null) detailErreur = premiere.get("message");
+                        if (detailErreur != null && !detailErreur.isNull()) return detailErreur.asText();
+                        return premiere.toString();
+                    }
+                }
             }
-            var errors = noeud.get("errors");
-            if (errors != null && errors.isArray() && errors.size() > 0) {
-                return errors.get(0).asText();
+            for (String cle : List.of("detail", "message", "title")) {
+                var valeur = noeud.get(cle);
+                if (valeur != null && !valeur.isNull() && !valeur.asText().isBlank()) {
+                    return valeur.asText();
+                }
             }
         } catch (RuntimeException ignore) {
             // corps non JSON : on retombe sur le code HTTP
