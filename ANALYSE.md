@@ -12,8 +12,8 @@ restent à consulter avant fusion.
 
 | | |
 |---|---|
-| **API** | 59 fichiers Java, ~2 198 lignes (`src/main/java`, recomptées — méthode différente de la v1.0) |
-| **Client** | 35 fichiers Java, ~2 325 lignes (4 fichiers supprimés par le patch 3.1) |
+| **API** | Module `tady-trano-api` : Spring Boot, JWT, JPA/Flyway, contrôleurs REST |
+| **Client** | Module `tady-trano-client` : JavaFX desktop, client HTTP/JSON, vues de recherche et de gestion |
 | **Tests** | **39 au total : 31 API** (20 annonces/recherche + 11 authentification) + 8 client (lecture JSON) |
 
 - Les fonctionnalités F1 à F10 du cahier des charges sont toutes présentes.
