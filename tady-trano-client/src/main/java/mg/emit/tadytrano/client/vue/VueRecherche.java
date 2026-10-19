@@ -1,11 +1,13 @@
 package mg.emit.tadytrano.client.vue;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.FlowPane;
@@ -36,7 +38,7 @@ import java.util.Set;
  *  pastilles de filtres rapides (CDC 8.3 / maquette Disign4e). */
 public class VueRecherche extends VBox {
 
-    private static final int TAILLE = 12;
+    private static final int TAILLE = 20;
     private static final double PRIX_MIN = 0;
     private static final double PRIX_MAX = 10_000_000;
     private static final double PAS_PRIX = 10_000;
@@ -67,12 +69,18 @@ public class VueRecherche extends VBox {
     private final List<ToggleButton> pastillesQuartier = new ArrayList<>();
 
     private final FlowPane liste = new FlowPane();
-    private final Label pageLabel = new Label();
-    private final Button precedent = new Button("\u2039");
-    private final Button suivant = new Button("\u203A");
+    private final ScrollPane defilement = new ScrollPane();
+    private final Label etat = new Label();
+    private final Button reessayer = new Button("Reessayer");
 
+    /** Prochaine page à charger (défilement continu). */
     private int page = 0;
-    private int totalPages = 0;
+    private boolean chargementEnCours = false;
+    private boolean toutCharge = false;
+    /** Bloque le chargement automatique après un échec, jusqu'à « Reessayer ». */
+    private boolean erreurSuite = false;
+    /** Filtres figés pour toutes les pages d'une même recherche. */
+    private Map<String, String> filtresActifs = new LinkedHashMap<>();
     /** Numero de sequence des recherches : permet d'ignorer les reponses perimees
      *  (filtre ou page change depuis le lancement de la requete). */
     private int generation = 0;
@@ -232,35 +240,43 @@ public class VueRecherche extends VBox {
             rechercher();
         });
 
-        // --- resultats ---
+        // --- résultats : défilement continu ---
         liste.setHgap(15);
         liste.setVgap(15);
         liste.setPrefWidth(Region.USE_COMPUTED_SIZE);
-        VBox conteneurListe = new VBox(liste);
-        conteneurListe.setPadding(new Insets(5, 0, 0, 0));
 
-        precedent.setOnAction(e -> {
-            if (page > 0) {
-                page--;
-                rechercher();
+        etat.getStyleClass().add("muted");
+        reessayer.getStyleClass().add("btn-ghost");
+        reessayer.setVisible(false);
+        reessayer.setManaged(false);
+        reessayer.setOnAction(e -> {
+            reessayer.setVisible(false);
+            reessayer.setManaged(false);
+            erreurSuite = false;
+            chargerSuite();
+        });
+        HBox pied = new HBox(12, etat, reessayer);
+        pied.setAlignment(Pos.CENTER);
+        pied.setPadding(new Insets(10, 0, 16, 0));
+
+        VBox contenu = new VBox(10, liste, pied);
+        contenu.setPadding(new Insets(5, 4, 0, 0));
+        defilement.setContent(contenu);
+        defilement.setFitToWidth(true);
+        defilement.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        defilement.getStyleClass().add("scroll-transparent");
+        // Charge la page suivante lorsque l'utilisateur approche du bas.
+        defilement.vvalueProperty().addListener((o, avant, apres) -> {
+            if (apres.doubleValue() >= defilement.getVmax() - 0.15) {
+                chargerSuite();
             }
         });
-        suivant.setOnAction(e -> {
-            if (page < totalPages - 1) {
-                page++;
-                rechercher();
-            }
-        });
-        pageLabel.getStyleClass().add("pagination-label");
-        precedent.getStyleClass().add("pagination-btn");
-        suivant.getStyleClass().add("pagination-btn");
-        HBox pagination = new HBox(15, precedent, pageLabel, suivant);
-        pagination.setAlignment(Pos.CENTER);
-        pagination.getStyleClass().add("pagination-bar");
+        // Si le contenu ne remplit pas la fenêtre, charger jusqu'à la remplir.
+        defilement.viewportBoundsProperty().addListener((o, avant, apres) -> completerSiBesoin());
 
         getChildren().addAll(titre, new Separator(), filtres, ligneAvancee,
-                new Separator(), conteneurListe, pagination);
-        VBox.setVgrow(conteneurListe, Priority.ALWAYS);
+                new Separator(), defilement);
+        VBox.setVgrow(defilement, Priority.ALWAYS);
     }
 
     private void majEtiquettesPrix() {
@@ -409,7 +425,23 @@ public class VueRecherche extends VBox {
     // Recherche
     // ------------------------------------------------------------------
 
+    /** Nouvelle recherche : réinitialise la liste et fige les filtres pour ses pages. */
     private void rechercher() {
+        generation++;
+        page = 0;
+        toutCharge = false;
+        chargementEnCours = false;
+        erreurSuite = false;
+        reessayer.setVisible(false);
+        reessayer.setManaged(false);
+        liste.getChildren().clear();
+        etat.setText("");
+        defilement.setVvalue(0);
+        filtresActifs = filtresCourants();
+        chargerSuite();
+    }
+
+    private Map<String, String> filtresCourants() {
         Map<String, String> filtres = new LinkedHashMap<>();
 
         String lieu = localisation.getValue() == null ? "" : localisation.getValue().trim();
@@ -425,6 +457,7 @@ public class VueRecherche extends VBox {
         if (type.getValue() != null) {
             filtres.put("typeLocationId", String.valueOf(type.getValue().id()));
         }
+        // La plage complète (0 à 10 000 000 Ar) ne limite pas les résultats.
         if (prix.bas() > PRIX_MIN) {
             filtres.put("prixMin", String.valueOf(Math.round(prix.bas())));
         }
@@ -442,29 +475,68 @@ public class VueRecherche extends VBox {
             filtres.put("lat", String.valueOf(quartierReference.latitude()));
             filtres.put("lng", String.valueOf(quartierReference.longitude()));
         }
+        return filtres;
+    }
 
-        Map<String, String> finaux = filtres;
+    /** Charge la page suivante et l'ajoute à la liste existante. */
+    private void chargerSuite() {
+        if (chargementEnCours || toutCharge || erreurSuite) {
+            return;
+        }
+        chargementEnCours = true;
+        etat.setText(liste.getChildren().isEmpty() ? "Chargement..." : "Chargement de la suite...");
+        final Map<String, String> filtres = new LinkedHashMap<>(filtresActifs);
         final int pageDemandee = page;
-        final int gen = ++generation;
-        app.appeler(() -> api.rechercher(finaux, pageDemandee, TAILLE),
+        final int gen = generation;
+        app.appeler(() -> api.rechercher(filtres, pageDemandee, TAILLE),
                 reponse -> {
                     if (gen != generation) {
-                        return; // reponse perimee : une recherche plus recente a ete lancee
+                        return; // une recherche plus récente a été lancée
                     }
-                    totalPages = reponse.totalPages();
-                    pageLabel.setText(reponse.totalPages() == 0
-                            ? "Aucun resultat"
-                            : "Page " + (reponse.page() + 1) + " / " + reponse.totalPages());
-                    precedent.setDisable(reponse.page() <= 0);
-                    suivant.setDisable(reponse.page() >= reponse.totalPages() - 1);
-                    afficher(reponse.contenu());
+                    for (AnnonceResumeResponse annonce : reponse.contenu()) {
+                        liste.getChildren().add(carte(annonce));
+                    }
+                    page = pageDemandee + 1;
+                    toutCharge = page >= reponse.totalPages();
+                    chargementEnCours = false;
+                    majEtat(reponse.totalElements());
+                    Platform.runLater(this::completerSiBesoin);
                 },
                 erreur -> {
                     if (gen != generation) {
-                        return; // erreur d'une recherche perimee : ignoree egalement
+                        return; // ignore l'erreur d'une requête périmée
                     }
+                    chargementEnCours = false;
+                    erreurSuite = true;
+                    etat.setText("Impossible de charger la suite.");
+                    reessayer.setVisible(true);
+                    reessayer.setManaged(true);
                     app.gererErreur(erreur);
                 });
+    }
+
+    private void majEtat(long total) {
+        if (liste.getChildren().isEmpty()) {
+            etat.setText("Aucun résultat");
+        } else if (toutCharge) {
+            etat.setText(total + " annonce(s) - fin des résultats");
+        } else {
+            etat.setText("");
+        }
+    }
+
+    /** Complète la liste si elle est trop courte pour créer une barre de défilement. */
+    private void completerSiBesoin() {
+        if (chargementEnCours || toutCharge || erreurSuite || defilement.getContent() == null) {
+            return;
+        }
+        defilement.applyCss();
+        defilement.layout();
+        double hauteurContenu = defilement.getContent().getBoundsInLocal().getHeight();
+        double hauteurVisible = defilement.getViewportBounds().getHeight();
+        if (hauteurVisible > 0 && hauteurContenu <= hauteurVisible) {
+            chargerSuite();
+        }
     }
 
     private void harmoniserPieces() {
@@ -507,13 +579,6 @@ public class VueRecherche extends VBox {
 
     private static String cle(String texte) {
         return texte == null ? "" : texte.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private void afficher(List<AnnonceResumeResponse> annonces) {
-        liste.getChildren().clear();
-        for (AnnonceResumeResponse annonce : annonces) {
-            liste.getChildren().add(carte(annonce));
-        }
     }
 
     /** Carte annonce cliquable (vignette pleine largeur + titre + prix + lieu). */
@@ -565,7 +630,8 @@ public class VueRecherche extends VBox {
         }
 
         carte.getChildren().addAll(media, corps);
-        carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), this::rechercher));
+        // Réaffiche le même objet vue pour conserver la liste et sa position de défilement.
+        carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), () -> app.ouvrir(this)));
         return carte;
     }
 }
