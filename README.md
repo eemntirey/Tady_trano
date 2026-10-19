@@ -52,30 +52,28 @@ mvn -pl tady-trano-client javafx:run
 
 ## Démarrage avec MySQL ou MariaDB
 
-Le schéma est créé par Flyway (`V1__init.sql`), puis les données initiales sont insérées (`V2__donnees_initiales.sql`).
+Le schéma est créé par Flyway (`V1__init.sql` à `V4__desactivation_comptes_demo.sql`). V2 conserve les données de démonstration historiques pour ne pas modifier une migration déjà appliquée ; V4 désactive les six comptes de démonstration connus sur les bases persistantes.
 
-**1. Définir les variables d'environnement.** `DB_PASSWORD` est obligatoire : l'API refuse de démarrer sans elle.
+**1. Définir toutes les variables obligatoires hors du profil `local`.** L'API refuse de démarrer si une configuration de connexion ou de signature est absente. Aucun identifiant `root`, mot de passe de base ou secret JWT de secours n'est défini dans la configuration commune.
 
 | Variable | Rôle | Défaut |
 |---|---|---|
+| `DB_URL` | URL JDBC complète | aucun (obligatoire) |
+| `DB_USER` | Utilisateur dédié à l'application | aucun (obligatoire) |
 | `DB_PASSWORD` | Mot de passe de la base | aucun (obligatoire) |
-| `DB_USER` | Utilisateur de la base | `root` |
-| `DB_URL` | URL JDBC | `jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&...` |
-| `JWT_SECRET` | Secret de signature des jetons | valeur de développement |
+| `JWT_SECRET` | Secret de signature JWT à forte entropie (au moins 32 octets aléatoires) | aucun (obligatoire) |
 | `JWT_EXPIRATION_MS` | Durée de vie des jetons | `86400000` (24 h) |
 | `SERVER_PORT` | Port de l'API | `8081` |
 
-Exemple sous Windows (PowerShell) :
+Pour Windows (PowerShell), Linux ou macOS, définissez `DB_URL`, `DB_USER`, `DB_PASSWORD` et `JWT_SECRET` dans l'environnement avant le démarrage. Utilisez un utilisateur MySQL dédié, avec uniquement les privilèges requis, et un secret aléatoire propre à l'environnement ; ne réutilisez pas la valeur d'exemple des tests.
+
+Exemple PowerShell (remplacez les valeurs entre chevrons par vos propres paramètres) :
 
 ```powershell
-$env:DB_PASSWORD = "votre_mot_de_passe"
-mvn -pl tady-trano-api spring-boot:run
-```
-
-Exemple sous Linux ou macOS :
-
-```bash
-export DB_PASSWORD="votre_mot_de_passe"
+$env:DB_URL = "jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8"
+$env:DB_USER = "<utilisateur_mysql_dedie>"
+$env:DB_PASSWORD = "<mot_de_passe_mysql>"
+$env:JWT_SECRET = "<secret_aleatoire_fort>"
 mvn -pl tady-trano-api spring-boot:run
 ```
 
@@ -103,9 +101,9 @@ mvn -pl tady-trano-client javafx:run -Dtady.api.url=http://localhost:9000
 | Propriétaire (agence) | `proprio@tady.test` | `proprio12345` |
 | Locataire | `locataire@tady.test` | `locataire12345` |
 
-**Base MySQL ou MariaDB (migration V2)**
+**Base MySQL ou MariaDB (migrations V2 puis V4)**
 
-Tous les comptes de la migration V2 ont le mot de passe `Pass1234!`. Par exemple `admin@tady.mg` (administrateur), `rakoto.proprio@gmail.com` (propriétaire) et `famille.rasoa@yahoo.fr` (locataire).
+V2 a historiquement inséré des comptes avec un mot de passe partagé `Pass1234!`. La migration V4 désactive ces six comptes connus, sans supprimer leurs lignes. Ne les réactivez pas pour un déploiement public. Les profils, annonces et photos de démonstration issus de V2 restent néanmoins présents dans la base persistante et doivent être examinés, masqués ou nettoyés avant la mise en production.
 
 ## Documentation de l'API
 
@@ -145,7 +143,7 @@ tady-trano/
 │   └── src/main/resources/
 │       ├── application.yml       configuration (MySQL / MariaDB)
 │       ├── application-local.yml profil H2 + données de démo
-│       └── db/migration/         scripts Flyway V1, V2
+│       └── db/migration/         scripts Flyway V1 à V4
 └── tady-trano-client/
     └── src/main/java/mg/emit/tadytrano/client/
         ├── api/                  client HTTP, session
@@ -166,10 +164,10 @@ tady-trano/
 
 ## Limites actuelles
 
-Projet destiné à un usage local. Avant toute mise en production, il faudrait :
+Projet encore à valider avant toute mise en production :
 
-- activer HTTPS (API et base de données) et définir un `JWT_SECRET` propre ;
-- retirer les comptes de démonstration de la migration V2 ;
-- limiter les tentatives de connexion ;
-- remplacer l'ajout de photos par URL par un téléversement avec contrôle du type et de la taille ;
-- ajouter un pré-filtre géographique pour le tri par distance si le nombre d'annonces devient important.
+- activer HTTPS (API et base de données) et stocker les secrets dans un gestionnaire de secrets ;
+- examiner et nettoyer/masquer les profils, annonces et photos de démonstration issus de V2 (V4 ne fait que désactiver les six comptes de connexion connus) ;
+- limiter les tentatives de connexion et ajouter une protection contre les abus d'authentification ;
+- remplacer l'ajout de photos par URL par un téléversement avec contrôle du type, de la taille et du contenu ;
+- surveiller les performances de recherche et ne définir un éventuel rayon géographique qu'après validation du contrat produit.
