@@ -55,10 +55,9 @@ public class VueDetail extends VBox {
         HBox vignettes = new HBox(8);
         for (PhotoResponse photo : annonce.photos()) {
             ImageView v = Affichage.vignette(photo.url(), 90, 60);
-            // On recharge l'image en taille principale (640x380) depuis l'URL,
-            // et non la vignette 90x60 deja decodee (floue).
-            v.setOnMouseClicked(e -> principale.setImage(
-                    Affichage.vignette(photo.url(), 640, 380).getImage()));
+            // Recharger dans la vue principale : une ImageView creee en
+            // chargement asynchrone ne doit pas etre copiee via getImage().
+            v.setOnMouseClicked(e -> Affichage.charger(principale, photo.url(), 640, 380));
             v.getStyleClass().add("thumb-clickable");
             vignettes.getChildren().add(v);
         }
@@ -109,12 +108,15 @@ public class VueDetail extends VBox {
     }
 
     private void majPrincipale(List<PhotoResponse> photos) {
-        photos.stream()
+        PhotoResponse photoPrincipale = photos.stream()
                 .filter(PhotoResponse::principale)
                 .findFirst()
                 .or(() -> photos.stream().findFirst())
-                .ifPresent(p -> principale.setImage(
-                        Affichage.vignette(p.url(), 640, 380).getImage()));
+                .orElse(null);
+        // Afficher un placeholder meme si l'annonce n'a aucune photo.
+        // charger() mettra a jour l'ImageView une fois le telechargement termine.
+        Affichage.charger(principale,
+                photoPrincipale == null ? null : photoPrincipale.url(), 640, 380);
     }
 
     private void basculerFavori(AnnonceDetailResponse annonce) {
@@ -142,7 +144,9 @@ public class VueDetail extends VBox {
 
     private void majLibelleFavori() {
         if (!app.estConnecte()) {
-            favori.setDisable(true);
+            // Le bouton reste actionnable pour expliquer la restriction au clic.
+            favori.setText("Connexion requise pour les favoris");
+            favori.setDisable(false);
             return;
         }
         favori.setDisable(true);
