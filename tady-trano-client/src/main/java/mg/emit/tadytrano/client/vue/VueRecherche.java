@@ -361,6 +361,7 @@ public class VueRecherche extends VBox {
                 } else if (q.nom().equals(localisation.getValue())) {
                     appliquerValeurFiltre(() -> localisation.setValue(null));
                 }
+                actualiserCommandeDistance();
                 page = 0;
                 rechercher();
             });
