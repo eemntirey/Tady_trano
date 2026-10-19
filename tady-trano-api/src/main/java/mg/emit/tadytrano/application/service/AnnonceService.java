@@ -142,14 +142,12 @@ public class AnnonceService {
     @Transactional
     public void changerStatut(String email, Long id, StatutAnnonceRequest demande) {
         Annonce annonce = annonceDeProprietaire(email, id);
-        if (annonce.getStatut() == StatutAnnonce.MASQUEE) {
+        if (annonce.isMasqueeParAdmin()) {
             throw new ApiException(HttpStatus.FORBIDDEN,
                     "Cette annonce est masquee par la moderation ; contactez l'administration.");
         }
-        if (demande.statut() == StatutAnnonce.MASQUEE) {
-            throw new ApiException(HttpStatus.FORBIDDEN,
-                    "Le masquage d'une annonce est reserve a l'administration.");
-        }
+        // Un proprietaire peut masquer/reactiver sa propre annonce, mais jamais lever
+        // le verrou pose par une moderation administrative.
         annonce.setStatut(demande.statut());
         annonceRepository.save(annonce);
     }
@@ -163,6 +161,7 @@ public class AnnonceService {
         Annonce annonce = annonceRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Annonce introuvable"));
         annonce.setStatut(demande.statut());
+        annonce.setMasqueeParAdmin(demande.statut() == StatutAnnonce.MASQUEE);
         annonceRepository.save(annonce);
     }
 

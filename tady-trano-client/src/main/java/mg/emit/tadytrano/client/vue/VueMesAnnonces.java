@@ -172,11 +172,6 @@ public class VueMesAnnonces extends VBox {
         photosBtn.setOnAction(e -> ouvrirGestionPhotos(a.id()));
 
         Button statutBtn = new Button("Statut");
-        boolean masqueeParModeration = "MASQUEE".equals(a.statut());
-        statutBtn.setDisable(masqueeParModeration);
-        if (masqueeParModeration) {
-            statutBtn.setTooltip(new Tooltip("Annonce masquee par l'administration : contactez le support."));
-        }
         statutBtn.setOnAction(e -> ouvrirChangementStatut(a));
 
         Button modifierBtn = new Button("Modifier");
@@ -194,7 +189,7 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void ouvrirChangementStatut(AnnonceResumeResponse a) {
-        ChoiceDialog<String> dialog = new ChoiceDialog<>(a.statut(), "ACTIVE", "LOUEE");
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(a.statut(), "ACTIVE", "LOUEE", "MASQUEE");
         dialog.setTitle("Statut de l'annonce");
         dialog.setHeaderText("Modifier le statut de : " + a.titre());
         dialog.setContentText("Nouveau statut :");

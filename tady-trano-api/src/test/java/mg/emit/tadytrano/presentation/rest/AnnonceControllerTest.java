@@ -280,14 +280,19 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                         .content("{\"statut\":\"MASQUEE\"}"))
                 .andExpect(status().isForbidden());
 
-        // Le proprietaire ne peut pas contourner la moderation ni masquer une annonce.
+        // Le proprietaire peut masquer puis reactiver sa propre annonce.
         mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
                         .header("Authorization", "Bearer " + jetonA)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"statut\":\"MASQUEE\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNoContent());
+        mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"ACTIVE\"}"))
+                .andExpect(status().isNoContent());
 
-        // Seule l'administration peut masquer l'annonce.
+        // Seule l'administration peut poser ensuite le verrou de moderation.
         String emailAdmin = emailUnique();
         inscrire(emailAdmin, Role.LOCATAIRE);
         jdbc.update("UPDATE utilisateur SET role = 'ADMIN' WHERE email = ?", emailAdmin);
