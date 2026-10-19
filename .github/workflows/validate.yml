@@ -61,7 +61,7 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Start API against MySQL and verify Flyway V3
+      - name: Start API against MySQL and verify Flyway V4
         env:
           DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
           DB_USER: root
@@ -124,7 +124,7 @@ jobs:
 
       - name: Verify required production configuration fails closed
         env:
-          DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true\&useSSL=false\&allowPublicKeyRetrieval=true\&serverTimezone=Indian/Antananarivo\&characterEncoding=utf8
+          DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
           DB_USER: root
           DB_PASSWORD: rootpass
           JWT_SECRET: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key-123456
