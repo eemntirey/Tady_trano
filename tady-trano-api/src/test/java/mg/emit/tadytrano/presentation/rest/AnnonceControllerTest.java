@@ -224,12 +224,30 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                         .content("{\"statut\":\"MASQUEE\"}"))
                 .andExpect(status().isForbidden());
 
-        // Le proprietaire legitime peut
+        // Le proprietaire ne peut pas contourner la moderation ni masquer une annonce.
         mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
                         .header("Authorization", "Bearer " + jetonA)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"statut\":\"MASQUEE\"}"))
+                .andExpect(status().isForbidden());
+
+        // Seule l'administration peut masquer l'annonce.
+        String emailAdmin = emailUnique();
+        inscrire(emailAdmin, Role.LOCATAIRE);
+        jdbc.update("UPDATE utilisateur SET role = 'ADMIN' WHERE email = ?", emailAdmin);
+        String jetonAdmin = connexion(emailAdmin);
+        mockMvc.perform(patch("/api/admin/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonAdmin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"MASQUEE\"}"))
                 .andExpect(status().isNoContent());
+
+        // Une annonce masquee par l'admin ne peut pas etre reactivee par le proprietaire.
+        mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"ACTIVE\"}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -285,9 +303,13 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                 .andExpect(status().isCreated());
         Long annonceId = jdbc.queryForObject("SELECT id FROM annonce", Long.class);
 
-        // Masquer l'annonce
-        mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
-                        .header("Authorization", "Bearer " + jeton)
+        // Seule l'administration peut masquer l'annonce.
+        String emailAdmin = emailUnique();
+        inscrire(emailAdmin, Role.LOCATAIRE);
+        jdbc.update("UPDATE utilisateur SET role = 'ADMIN' WHERE email = ?", emailAdmin);
+        String jetonAdmin = connexion(emailAdmin);
+        mockMvc.perform(patch("/api/admin/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonAdmin)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"statut\":\"MASQUEE\"}"))
                 .andExpect(status().isNoContent());

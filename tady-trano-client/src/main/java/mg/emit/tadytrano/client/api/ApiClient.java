@@ -261,25 +261,24 @@ public class ApiClient {
         }
         try {
             var noeud = MAPPER.readTree(json);
+            // Pour une erreur de validation, preferer le detail du champ au detail generique.
+            for (String cle : List.of("erreurs", "errors")) {
+                var erreurs = noeud.get(cle);
+                if (erreurs != null && erreurs.isArray() && erreurs.size() > 0) {
+                    var premiere = erreurs.get(0);
+                    if (!premiere.isNull()) {
+                        if (premiere.isTextual()) return premiere.asText();
+                        var detailErreur = premiere.get("defaultMessage");
+                        if (detailErreur == null) detailErreur = premiere.get("message");
+                        if (detailErreur != null && !detailErreur.isNull()) return detailErreur.asText();
+                        return premiere.toString();
+                    }
+                }
+            }
             for (String cle : List.of("detail", "message", "title")) {
                 var valeur = noeud.get(cle);
                 if (valeur != null && !valeur.isNull() && !valeur.asText().isBlank()) {
                     return valeur.asText();
-                }
-            }
-            for (String cle : List.of("erreurs", "errors")) {
-                var erreurs = noeud.get(cle);
-                if (erreurs != null && erreurs.isArray() && !erreurs.isEmpty()) {
-                    var premiere = erreurs.get(0);
-                    if (!premiere.isNull()) {
-                        if (premiere.isTextual()) {
-                            return premiere.asText();
-                        }
-                        var detail = premiere.get("defaultMessage");
-                        if (detail == null) detail = premiere.get("message");
-                        if (detail != null && !detail.isNull()) return detail.asText();
-                        return premiere.toString();
-                    }
                 }
             }
         } catch (RuntimeException ignore) {

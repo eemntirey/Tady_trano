@@ -128,7 +128,8 @@ class ApiClientParsingTest {
                 {"title":"Bad Request","status":400,"detail":"Donnees invalides",
                  "erreurs":["prix : doit etre strictement positif"]}
                 """;
-        assertEquals("Donnees invalides", ApiClient.messageDerreur(validation, 400));
+        assertEquals("prix : doit etre strictement positif",
+                ApiClient.messageDerreur(validation, 400));
         assertEquals("prix : doit etre strictement positif",
                 ApiClient.messageDerreur("{\"erreurs\":[\"prix : doit etre strictement positif\"]}", 400));
     }
