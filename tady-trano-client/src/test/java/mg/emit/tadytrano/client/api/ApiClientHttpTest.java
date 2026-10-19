@@ -10,10 +10,12 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -166,6 +168,39 @@ class ApiClientHttpTest {
         assertFalse(session.estAdmin());
         session.majProfil(profil);
         assertTrue(session.estAdmin());
+    }
+
+    @Test
+    void rechercheTransmetFiltresPiecesPrixEtPosition() {
+        reponses.put("/api/annonces", new Reponse(200,
+                "{\"contenu\":[],\"page\":0,\"taille\":12,\"totalElements\":0,\"totalPages\":0}"));
+        Map<String, String> filtres = Map.of(
+                "nbPiecesMin", "2",
+                "nbPiecesMax", "4",
+                "prixMin", "0",
+                "prixMax", "10000000",
+                "lat", "-18.8792",
+                "lng", "47.5079");
+
+        client().rechercher(filtres, 0, 12);
+
+        String uri = chemins.get(0);
+        assertTrue(uri.startsWith("/api/annonces?"));
+        Map<String, String> transmis = new LinkedHashMap<>();
+        for (String paire : uri.substring(uri.indexOf('?') + 1).split("&")) {
+            String[] morceaux = paire.split("=", 2);
+            transmis.put(URLDecoder.decode(morceaux[0], StandardCharsets.UTF_8),
+                    morceaux.length == 2
+                            ? URLDecoder.decode(morceaux[1], StandardCharsets.UTF_8) : "");
+        }
+        assertEquals("2", transmis.get("nbPiecesMin"));
+        assertEquals("4", transmis.get("nbPiecesMax"));
+        assertEquals("0", transmis.get("prixMin"));
+        assertEquals("10000000", transmis.get("prixMax"));
+        assertEquals("-18.8792", transmis.get("lat"));
+        assertEquals("47.5079", transmis.get("lng"));
+        assertEquals("0", transmis.get("page"));
+        assertEquals("12", transmis.get("taille"));
     }
 
     // ------------------------------------------------------------------

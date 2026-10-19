@@ -1,14 +1,15 @@
 package mg.emit.tadytrano.client.vue;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -37,12 +38,13 @@ import java.util.Set;
  *  pastilles de filtres rapides (CDC 8.3 / maquette Disign4e). */
 public class VueRecherche extends VBox {
 
-    private static final int TAILLE = 12;
+    private static final int TAILLE = 20;
     private static final double PRIX_MIN = 0;
     private static final double PRIX_MAX = 10_000_000;
     private static final double PAS_PRIX = 10_000;
-    private static final double PRIX_BAS_DEFAUT = 0;
-    private static final double PRIX_HAUT_DEFAUT = 10_000_000;
+    // Aucun filtre de prix par défaut : ne pas masquer les petites annonces.
+    private static final double PRIX_BAS_DEFAUT = PRIX_MIN;
+    private static final double PRIX_HAUT_DEFAUT = PRIX_MAX;
     /** Nombre maximal de pastilles de quartiers proposees en raccourci. */
     private static final int PASTILLES_QUARTIER = 10;
 
@@ -51,11 +53,11 @@ public class VueRecherche extends VBox {
 
     private final ComboBox<String> localisation = new ComboBox<>();
     private final ComboBox<TypeLocationResponse> type = new ComboBox<>();
-    private final ComboBox<Integer> nbPiecesMin = new ComboBox<>();
-    private final ComboBox<Integer> nbPiecesMax = new ComboBox<>();
-    /** Tri par distance depuis le quartier selectionne (position de reference, D3). */
-    private final ToggleButton proximite = new ToggleButton("Autour du quartier");
-    private final Button lancer = new Button("Rechercher");
+    private final ComboBox<Integer> piecesMin = new ComboBox<>();
+    private final ComboBox<Integer> piecesMax = new ComboBox<>();
+    private final Button autourQuartier = new Button("Autour du quartier");
+    private final Label positionStatut = new Label("Choisissez un quartier pour trier par distance.");
+    private boolean triParDistance = false;
     private final CurseurPlage prix = new CurseurPlage(PRIX_MIN, PRIX_MAX, PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT, PAS_PRIX);
     private final Label prixBas = new Label();
     private final Label prixHaut = new Label();
@@ -67,15 +69,23 @@ public class VueRecherche extends VBox {
     private final List<ToggleButton> pastillesQuartier = new ArrayList<>();
 
     private final FlowPane liste = new FlowPane();
-    private final Label pageLabel = new Label();
-    private final Button precedent = new Button("\u2039");
-    private final Button suivant = new Button("\u203A");
+    private final ScrollPane defilement = new ScrollPane();
+    private final Label etat = new Label();
+    private final Button reessayer = new Button("Reessayer");
 
+    /** Prochaine page à charger (défilement continu). */
     private int page = 0;
-    private int totalPages = 0;
+    private boolean chargementEnCours = false;
+    private boolean toutCharge = false;
+    /** Bloque le chargement automatique après un échec, jusqu'à « Reessayer ». */
+    private boolean erreurSuite = false;
+    /** Filtres figés pour toutes les pages d'une même recherche. */
+    private Map<String, String> filtresActifs = new LinkedHashMap<>();
     /** Numero de sequence des recherches : permet d'ignorer les reponses perimees
      *  (filtre ou page change depuis le lancement de la requete). */
     private int generation = 0;
+    /** Evite les actions reentrantes lorsque les pastilles pilotent les ComboBox. */
+    private boolean miseAJourFiltresEnCours = false;
 
     public VueRecherche(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -131,39 +141,6 @@ public class VueRecherche extends VBox {
         type.setPrefWidth(160);
         type.getStyleClass().add("filter-field");
 
-        nbPiecesMin.getStyleClass().add("filter-field");
-        nbPiecesMin.setPromptText("Pièces min");
-        nbPiecesMin.setPrefWidth(100);
-        nbPiecesMin.getItems().add(null);
-        nbPiecesMin.getItems().addAll(1, 2, 3, 4, 5, 6);
-        nbPiecesMin.setConverter(new javafx.util.StringConverter<>() {
-            @Override
-            public String toString(Integer v) {
-                return v == null ? "" : String.valueOf(v);
-            }
-
-            @Override
-            public Integer fromString(String s) {
-                return (s == null || s.isBlank()) ? null : Integer.valueOf(s.trim());
-            }
-        });
-        nbPiecesMax.getStyleClass().add("filter-field");
-        nbPiecesMax.setPromptText("Pièces max");
-        nbPiecesMax.setPrefWidth(100);
-        nbPiecesMax.getItems().add(null);
-        nbPiecesMax.getItems().addAll(1, 2, 3, 4, 5, 6);
-        nbPiecesMax.setConverter(new javafx.util.StringConverter<>() {
-            @Override
-            public String toString(Integer v) {
-                return v == null ? "" : String.valueOf(v);
-            }
-
-            @Override
-            public Integer fromString(String s) {
-                return (s == null || s.isBlank()) ? null : Integer.valueOf(s.trim());
-            }
-        });
-
         prixBas.getStyleClass().add("range-value");
         prixHaut.getStyleClass().add("range-value");
         prix.setMaxWidth(Double.MAX_VALUE);
@@ -173,11 +150,29 @@ public class VueRecherche extends VBox {
         HBox.setHgrow(plage, Priority.ALWAYS);
         plage.setMinWidth(260);
 
-        HBox ligneFiltres = new HBox(12, champLocalisation, type, nbPiecesMin, nbPiecesMax, plage);
+        HBox ligneFiltres = new HBox(12, champLocalisation, type, plage);
         ligneFiltres.setAlignment(Pos.CENTER_LEFT);
+
+        // Filtres fonctionnels de nombre de pièces et position de référence.
+        piecesMin.setPromptText("Pièces min.");
+        piecesMax.setPromptText("Pièces max.");
+        piecesMin.getItems().setAll(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        piecesMax.getItems().setAll(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        piecesMin.setPrefWidth(110);
+        piecesMax.setPrefWidth(110);
+        piecesMin.getStyleClass().add("filter-field");
+        piecesMax.getStyleClass().add("filter-field");
+        autourQuartier.setDisable(true);
+        autourQuartier.getStyleClass().add("btn-ghost");
+        positionStatut.getStyleClass().add("muted");
+        HBox ligneAvancee = new HBox(10, new Label("Nombre de pièces :"),
+                piecesMin, piecesMax, autourQuartier, positionStatut);
+        ligneAvancee.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(positionStatut, Priority.ALWAYS);
 
         // --- pastilles de filtres rapides + actions ---
         pastilles.getStyleClass().add("chips-row");
+        Button lancer = new Button("Rechercher");
         lancer.setDefaultButton(true);
         lancer.getStyleClass().add("btn-primary-custom");
         lancer.setOnAction(e -> {
@@ -187,18 +182,7 @@ public class VueRecherche extends VBox {
         Button reinitialiser = new Button("Reinitialiser");
         reinitialiser.getStyleClass().add("btn-ghost");
         reinitialiser.setOnAction(e -> reinitialiser());
-
-        // D3 : position de reference = quartier selectionne (tri par distance).
-        proximite.getStyleClass().add("chip");
-        proximite.setTooltip(new Tooltip(
-                "Trier les résultats par distance depuis le quartier sélectionné."));
-        proximite.setDisable(true);
-        proximite.setOnAction(e -> {
-            page = 0;
-            rechercher();
-        });
-
-        HBox actions = new HBox(10, reinitialiser, proximite, lancer);
+        HBox actions = new HBox(10, reinitialiser, lancer);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         HBox lignePastilles = new HBox(12, pastilles, actions);
@@ -210,57 +194,89 @@ public class VueRecherche extends VBox {
         prix.basProperty().addListener((o, a, b) -> majEtiquettesPrix());
         prix.hautProperty().addListener((o, a, b) -> majEtiquettesPrix());
         majEtiquettesPrix();
-        // Disponibilite du tri « Autour du quartier » (aussi pour les selections
-        // programmatiques qui ne declencheraient pas onAction).
-        localisation.valueProperty().addListener((o, a, b) -> majProximite());
 
         localisation.setOnAction(e -> {
+            if (miseAJourFiltresEnCours) {
+                return;
+            }
+            triParDistance = false;
+            actualiserCommandeDistance();
             page = 0;
             deselecterSauf(pastillesQuartier, null);
             rechercher();
         });
         type.setOnAction(e -> {
+            if (miseAJourFiltresEnCours) {
+                return;
+            }
             page = 0;
             deselecterSauf(pastillesType, null);
             rechercher();
         });
-        nbPiecesMin.setOnAction(e -> {
+
+        piecesMin.setOnAction(e -> {
+            harmoniserPieces();
             page = 0;
             rechercher();
         });
-        nbPiecesMax.setOnAction(e -> {
+        piecesMax.setOnAction(e -> {
+            harmoniserPieces();
+            page = 0;
+            rechercher();
+        });
+        autourQuartier.setOnAction(e -> {
+            QuartierResponse quartier = quartierSelectionne();
+            if (quartier == null || !coordonneesValides(quartier)) {
+                triParDistance = false;
+                positionStatut.setText("Ce quartier n'a pas de coordonnées.");
+            } else {
+                triParDistance = !triParDistance;
+                positionStatut.setText(triParDistance
+                        ? "Résultats triés par distance de " + quartier.nom()
+                        : "Tri par date de publication.");
+            }
+            actualiserCommandeDistance();
             page = 0;
             rechercher();
         });
 
-        // --- resultats ---
+        // --- résultats : défilement continu ---
         liste.setHgap(15);
         liste.setVgap(15);
         liste.setPrefWidth(Region.USE_COMPUTED_SIZE);
-        VBox conteneurListe = new VBox(liste);
-        conteneurListe.setPadding(new Insets(5, 0, 0, 0));
 
-        precedent.setOnAction(e -> {
-            if (page > 0) {
-                page--;
-                rechercher();
+        etat.getStyleClass().add("muted");
+        reessayer.getStyleClass().add("btn-ghost");
+        reessayer.setVisible(false);
+        reessayer.setManaged(false);
+        reessayer.setOnAction(e -> {
+            reessayer.setVisible(false);
+            reessayer.setManaged(false);
+            erreurSuite = false;
+            chargerSuite();
+        });
+        HBox pied = new HBox(12, etat, reessayer);
+        pied.setAlignment(Pos.CENTER);
+        pied.setPadding(new Insets(10, 0, 16, 0));
+
+        VBox contenu = new VBox(10, liste, pied);
+        contenu.setPadding(new Insets(5, 4, 0, 0));
+        defilement.setContent(contenu);
+        defilement.setFitToWidth(true);
+        defilement.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        defilement.getStyleClass().add("scroll-transparent");
+        // Charge la page suivante lorsque l'utilisateur approche du bas.
+        defilement.vvalueProperty().addListener((o, avant, apres) -> {
+            if (apres.doubleValue() >= defilement.getVmax() - 0.15) {
+                chargerSuite();
             }
         });
-        suivant.setOnAction(e -> {
-            if (page < totalPages - 1) {
-                page++;
-                rechercher();
-            }
-        });
-        pageLabel.getStyleClass().add("pagination-label");
-        precedent.getStyleClass().add("pagination-btn");
-        suivant.getStyleClass().add("pagination-btn");
-        HBox pagination = new HBox(15, precedent, pageLabel, suivant);
-        pagination.setAlignment(Pos.CENTER);
-        pagination.getStyleClass().add("pagination-bar");
+        // Si le contenu ne remplit pas la fenêtre, charger jusqu'à la remplir.
+        defilement.viewportBoundsProperty().addListener((o, avant, apres) -> completerSiBesoin());
 
-        getChildren().addAll(titre, new Separator(), filtres, new Separator(), conteneurListe, pagination);
-        VBox.setVgrow(conteneurListe, Priority.ALWAYS);
+        getChildren().addAll(titre, new Separator(), filtres, ligneAvancee,
+                new Separator(), defilement);
+        VBox.setVgrow(defilement, Priority.ALWAYS);
     }
 
     private void majEtiquettesPrix() {
@@ -335,10 +351,10 @@ public class VueRecherche extends VBox {
             pastille.getStyleClass().add("chip");
             pastille.setOnAction(e -> {
                 if (pastille.isSelected()) {
-                    type.setValue(t);
+                    appliquerValeurFiltre(() -> type.setValue(t));
                     deselecterSauf(pastillesType, pastille);
                 } else if (type.getValue() == t) {
-                    type.setValue(null);
+                    appliquerValeurFiltre(() -> type.setValue(null));
                 }
                 page = 0;
                 rechercher();
@@ -356,16 +372,27 @@ public class VueRecherche extends VBox {
             pastille.getStyleClass().add("chip");
             pastille.setOnAction(e -> {
                 if (pastille.isSelected()) {
-                    localisation.setValue(q.nom());
+                    appliquerValeurFiltre(() -> localisation.setValue(q.nom()));
                     deselecterSauf(pastillesQuartier, pastille);
                 } else if (q.nom().equals(localisation.getValue())) {
-                    localisation.setValue(null);
+                    appliquerValeurFiltre(() -> localisation.setValue(null));
                 }
+                actualiserCommandeDistance();
                 page = 0;
                 rechercher();
             });
             pastillesQuartier.add(pastille);
             pastilles.getChildren().add(pastille);
+        }
+    }
+
+    /** Modifie un filtre depuis une pastille sans déclencher le gestionnaire ComboBox en doublon. */
+    private void appliquerValeurFiltre(Runnable changement) {
+        miseAJourFiltresEnCours = true;
+        try {
+            changement.run();
+        } finally {
+            miseAJourFiltresEnCours = false;
         }
     }
 
@@ -378,12 +405,16 @@ public class VueRecherche extends VBox {
     }
 
     private void reinitialiser() {
-        localisation.setValue(null);
-        type.setValue(null);
-        nbPiecesMin.setValue(null);
-        nbPiecesMax.setValue(null);
-        proximite.setSelected(false);
+        appliquerValeurFiltre(() -> {
+            localisation.setValue(null);
+            type.setValue(null);
+        });
         prix.reinitialiser(PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT);
+        piecesMin.setValue(null);
+        piecesMax.setValue(null);
+        triParDistance = false;
+        actualiserCommandeDistance();
+        positionStatut.setText("Choisissez un quartier pour trier par distance.");
         deselecterSauf(pastillesType, null);
         deselecterSauf(pastillesQuartier, null);
         page = 0;
@@ -394,7 +425,23 @@ public class VueRecherche extends VBox {
     // Recherche
     // ------------------------------------------------------------------
 
+    /** Nouvelle recherche : réinitialise la liste et fige les filtres pour ses pages. */
     private void rechercher() {
+        generation++;
+        page = 0;
+        toutCharge = false;
+        chargementEnCours = false;
+        erreurSuite = false;
+        reessayer.setVisible(false);
+        reessayer.setManaged(false);
+        liste.getChildren().clear();
+        etat.setText("");
+        defilement.setVvalue(0);
+        filtresActifs = filtresCourants();
+        chargerSuite();
+    }
+
+    private Map<String, String> filtresCourants() {
         Map<String, String> filtres = new LinkedHashMap<>();
 
         String lieu = localisation.getValue() == null ? "" : localisation.getValue().trim();
@@ -405,87 +452,133 @@ public class VueRecherche extends VBox {
                 filtres.put("villeId", String.valueOf(ville.id()));
             } else if (quartier != null) {
                 filtres.put("quartierId", String.valueOf(quartier.id()));
-                // D3 : position de reference = centre du quartier, uniquement
-                // si l'utilisateur a active le tri « Autour du quartier ».
-                if (proximite.isSelected()
-                        && quartier.latitude() != null && quartier.longitude() != null) {
-                    filtres.put("lat", String.valueOf(quartier.latitude()));
-                    filtres.put("lng", String.valueOf(quartier.longitude()));
-                }
             }
-        }
-        if (nbPiecesMin.getValue() != null) {
-            filtres.put("nbPiecesMin", String.valueOf(nbPiecesMin.getValue()));
-        }
-        if (nbPiecesMax.getValue() != null) {
-            filtres.put("nbPiecesMax", String.valueOf(nbPiecesMax.getValue()));
         }
         if (type.getValue() != null) {
             filtres.put("typeLocationId", String.valueOf(type.getValue().id()));
         }
+        // La plage complète (0 à 10 000 000 Ar) ne limite pas les résultats.
         if (prix.bas() > PRIX_MIN) {
             filtres.put("prixMin", String.valueOf(Math.round(prix.bas())));
         }
         if (prix.haut() < PRIX_MAX) {
             filtres.put("prixMax", String.valueOf(Math.round(prix.haut())));
         }
+        if (piecesMin.getValue() != null) {
+            filtres.put("nbPiecesMin", String.valueOf(piecesMin.getValue()));
+        }
+        if (piecesMax.getValue() != null) {
+            filtres.put("nbPiecesMax", String.valueOf(piecesMax.getValue()));
+        }
+        QuartierResponse quartierReference = quartierSelectionne();
+        if (triParDistance && quartierReference != null && coordonneesValides(quartierReference)) {
+            filtres.put("lat", String.valueOf(quartierReference.latitude()));
+            filtres.put("lng", String.valueOf(quartierReference.longitude()));
+        }
+        return filtres;
+    }
 
-        Map<String, String> finaux = filtres;
+    /** Charge la page suivante et l'ajoute à la liste existante. */
+    private void chargerSuite() {
+        if (chargementEnCours || toutCharge || erreurSuite) {
+            return;
+        }
+        chargementEnCours = true;
+        etat.setText(liste.getChildren().isEmpty() ? "Chargement..." : "Chargement de la suite...");
+        final Map<String, String> filtres = new LinkedHashMap<>(filtresActifs);
         final int pageDemandee = page;
-        final int gen = ++generation;
-        lancer.setDisable(true); // anti double-clic : un seul appel en vol (D7)
-        app.appeler(() -> api.rechercher(finaux, pageDemandee, TAILLE),
+        final int gen = generation;
+        app.appeler(() -> api.rechercher(filtres, pageDemandee, TAILLE),
                 reponse -> {
                     if (gen != generation) {
-                        return; // reponse perimee : une recherche plus recente a ete lancee
+                        return; // une recherche plus récente a été lancée
                     }
-                    lancer.setDisable(false);
-                    totalPages = reponse.totalPages();
-                    pageLabel.setText(reponse.totalPages() == 0
-                            ? "Aucun resultat"
-                            : "Page " + (reponse.page() + 1) + " / " + reponse.totalPages());
-                    precedent.setDisable(reponse.page() <= 0);
-                    suivant.setDisable(reponse.page() >= reponse.totalPages() - 1);
-                    afficher(reponse.contenu());
+                    for (AnnonceResumeResponse annonce : reponse.contenu()) {
+                        liste.getChildren().add(carte(annonce));
+                    }
+                    page = pageDemandee + 1;
+                    toutCharge = page >= reponse.totalPages();
+                    chargementEnCours = false;
+                    majEtat(reponse.totalElements());
+                    Platform.runLater(this::completerSiBesoin);
                 },
                 erreur -> {
                     if (gen != generation) {
-                        return; // erreur d'une recherche perimee : ignoree egalement
+                        return; // ignore l'erreur d'une requête périmée
                     }
-                    lancer.setDisable(false);
+                    chargementEnCours = false;
+                    erreurSuite = true;
+                    etat.setText("Impossible de charger la suite.");
+                    reessayer.setVisible(true);
+                    reessayer.setManaged(true);
                     app.gererErreur(erreur);
                 });
     }
 
-    /** Quartier selectionne dans le champ localisation (null si ville ou rien). */
-    private QuartierResponse quartierSelectionne() {
-        String lieu = localisation.getValue() == null ? "" : localisation.getValue().trim();
-        if (lieu.isEmpty() || villesParNom.containsKey(cle(lieu))) {
-            return null;
+    private void majEtat(long total) {
+        if (liste.getChildren().isEmpty()) {
+            etat.setText("Aucun résultat");
+        } else if (toutCharge) {
+            etat.setText(total + " annonce(s) - fin des résultats");
+        } else {
+            etat.setText("");
         }
-        return quartiersParNom.get(cle(lieu));
     }
 
-    /** Le tri « Autour du quartier » n'a de sens que sur un quartier avec coordonnees. */
-    private void majProximite() {
+    /** Complète la liste si elle est trop courte pour créer une barre de défilement. */
+    private void completerSiBesoin() {
+        if (chargementEnCours || toutCharge || erreurSuite || defilement.getContent() == null) {
+            return;
+        }
+        defilement.applyCss();
+        defilement.layout();
+        double hauteurContenu = defilement.getContent().getBoundsInLocal().getHeight();
+        double hauteurVisible = defilement.getViewportBounds().getHeight();
+        if (hauteurVisible > 0 && hauteurContenu <= hauteurVisible) {
+            chargerSuite();
+        }
+    }
+
+    private void harmoniserPieces() {
+        Integer min = piecesMin.getValue();
+        Integer max = piecesMax.getValue();
+        if (min != null && max != null && min > max) {
+            // Garder une plage cohérente en ajustant l'autre borne.
+            if (piecesMin.isFocused()) {
+                piecesMax.setValue(min);
+            } else {
+                piecesMin.setValue(max);
+            }
+        }
+    }
+
+    private QuartierResponse quartierSelectionne() {
+        String lieu = localisation.getValue();
+        return lieu == null ? null : quartiersParNom.get(cle(lieu));
+    }
+
+    private static boolean coordonneesValides(QuartierResponse quartier) {
+        return quartier.latitude() != null && quartier.longitude() != null
+                && Double.isFinite(quartier.latitude()) && Double.isFinite(quartier.longitude())
+                && quartier.latitude() >= -90 && quartier.latitude() <= 90
+                && quartier.longitude() >= -180 && quartier.longitude() <= 180;
+    }
+
+    private void actualiserCommandeDistance() {
         QuartierResponse quartier = quartierSelectionne();
-        boolean disponible = quartier != null
-                && quartier.latitude() != null && quartier.longitude() != null;
-        proximite.setDisable(!disponible);
-        if (!disponible && proximite.isSelected()) {
-            proximite.setSelected(false);
+        boolean disponible = quartier != null && coordonneesValides(quartier);
+        autourQuartier.setDisable(!disponible);
+        autourQuartier.setText(triParDistance ? "Tri par distance : actif" : "Autour du quartier");
+        if (!disponible) {
+            triParDistance = false;
+            if (positionStatut != null) {
+                positionStatut.setText("Choisissez un quartier avec coordonnées.");
+            }
         }
     }
 
     private static String cle(String texte) {
         return texte == null ? "" : texte.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private void afficher(List<AnnonceResumeResponse> annonces) {
-        liste.getChildren().clear();
-        for (AnnonceResumeResponse annonce : annonces) {
-            liste.getChildren().add(carte(annonce));
-        }
     }
 
     /** Carte annonce cliquable (vignette pleine largeur + titre + prix + lieu). */
@@ -528,8 +621,7 @@ public class VueRecherche extends VBox {
             badges.getChildren().add(typeBadge);
         }
         if (annonce.distanceKm() != null) {
-            // distanceKm n'est renseigne que si un repere (quartier) a ete fourni.
-            Label distance = new Label(Affichage.distance(annonce.distanceKm()) + " du quartier");
+            Label distance = new Label(Affichage.distance(annonce.distanceKm()) + " de vous");
             distance.getStyleClass().add("badge-distance");
             badges.getChildren().add(distance);
         }
@@ -538,7 +630,8 @@ public class VueRecherche extends VBox {
         }
 
         carte.getChildren().addAll(media, corps);
-        carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), this::rechercher));
+        // Réaffiche le même objet vue pour conserver la liste et sa position de défilement.
+        carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), () -> app.ouvrir(this)));
         return carte;
     }
 }

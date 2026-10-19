@@ -63,14 +63,14 @@ public class VueMesAnnonces extends VBox {
         nouvelleAnnonce.getStyleClass().add("btn-success-custom");
         // Le serveur exige le role PROPRIETAIRE pour POST /api/annonces :
         // on bloque tot avec un message clair au lieu du 403.
-        nouvelleAnnonce.setOnAction(e -> uneFois(nouvelleAnnonce, () -> {
+        nouvelleAnnonce.setOnAction(e -> {
             if (!app.estProprietaire()) {
                 Affichage.erreur(new RuntimeException(
                         "La publication est réservée aux comptes Propriétaire."));
                 return;
             }
             ouvrirFormulaire(null);
-        }));
+        });
 
         enTete.getChildren().addAll(titre, espace, nouvelleAnnonce);
 
@@ -193,13 +193,13 @@ public class VueMesAnnonces extends VBox {
 
         // Actions
         Button photosBtn = new Button("Photos");
-        photosBtn.setOnAction(e -> uneFois(photosBtn, () -> ouvrirGestionPhotos(a.id())));
+        photosBtn.setOnAction(e -> ouvrirGestionPhotos(a.id()));
 
         Button statutBtn = new Button("Statut");
         statutBtn.setOnAction(e -> ouvrirChangementStatut(a, statutBtn));
 
         Button modifierBtn = new Button("Modifier");
-        modifierBtn.setOnAction(e -> uneFois(modifierBtn, () -> ouvrirFormulaire(a.id())));
+        modifierBtn.setOnAction(e -> ouvrirFormulaire(a.id()));
 
         Button supprimerBtn = new Button("Supprimer");
         supprimerBtn.getStyleClass().add("btn-danger-custom");
@@ -212,77 +212,52 @@ public class VueMesAnnonces extends VBox {
         return ligne;
     }
 
-    /** Anti double-clic (D7) : le bouton est desactive pendant l'ouverture de la
-     *  fenetre modale ; le second clic filtre tant qu'elle est ouverte. */
-    private void uneFois(Button bouton, Runnable action) {
-        if (bouton.isDisable()) {
-            return;
-        }
-        bouton.setDisable(true);
-        try {
-            action.run();
-        } finally {
-            bouton.setDisable(false);
-        }
-    }
-
     private void ouvrirChangementStatut(AnnonceResumeResponse a, Button bouton) {
-        if (bouton.isDisable()) {
-            return; // anti double-clic : une seule fenetre / un seul appel en vol
-        }
-        bouton.setDisable(true);
         ChoiceDialog<String> dialog = new ChoiceDialog<>(a.statut(), "ACTIVE", "LOUEE", "MASQUEE");
         dialog.setTitle("Statut de l'annonce");
         dialog.setHeaderText("Modifier le statut de : " + a.titre());
         dialog.setContentText("Nouveau statut :");
 
         Optional<String> res = dialog.showAndWait();
-        if (res.isEmpty()) {
-            bouton.setDisable(false);
-            return;
-        }
-        String nouveauStatut = res.get();
-        app.appeler(() -> {
-            api.changerStatutAnnonce(a.id(), new StatutAnnonceRequest(nouveauStatut));
-            return null;
-        },
-        r -> {
-            charger(); // la liste est reconstruite : le bouton part avec l'ancienne ligne
-            Affichage.succes("Statut mis à jour : " + nouveauStatut + ".");
-        },
-        err -> {
-            bouton.setDisable(false);
-            app.gererErreur(err);
+        res.ifPresent(nouveauStatut -> {
+            bouton.setDisable(true);
+            app.appeler(() -> {
+                api.changerStatutAnnonce(a.id(), new StatutAnnonceRequest(nouveauStatut));
+                return null;
+            },
+            r -> {
+                charger();
+                Affichage.succes("Statut mis à jour : " + nouveauStatut + ".");
+            },
+            err -> {
+                bouton.setDisable(false);
+                app.gererErreur(err);
+            });
         });
     }
 
     private void confirmerSuppression(AnnonceResumeResponse a, Button bouton) {
-        if (bouton.isDisable()) {
-            return; // anti double-clic : une seule fenetre / un seul appel en vol
-        }
-        bouton.setDisable(true);
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Confirmation de suppression");
         alert.setHeaderText("Supprimer l'annonce : " + a.titre() + " ?");
         alert.setContentText("Cette action supprimera définitivement l'annonce ainsi que ses photos.");
 
         Optional<ButtonType> res = alert.showAndWait();
-        if (res.isEmpty() || res.get() != ButtonType.OK) {
-            bouton.setDisable(false);
-            return;
+        if (res.isPresent() && res.get() == ButtonType.OK) {
+            bouton.setDisable(true);
+            app.appeler(() -> {
+                api.supprimerAnnonce(a.id());
+                return null;
+            },
+            r -> {
+                charger();
+                Affichage.succes("Annonce supprimée.");
+            },
+            err -> {
+                bouton.setDisable(false);
+                app.gererErreur(err);
+            });
         }
-        app.appeler(() -> {
-            api.supprimerAnnonce(a.id());
-            return null;
-        },
-        r -> {
-            charger();
-            Affichage.succes("Annonce supprimée.");
-        },
-        err -> {
-            bouton.setDisable(false);
-            app.gererErreur(err);
-        });
     }
 
     private void ouvrirFormulaire(Long idModification) {
@@ -381,11 +356,11 @@ public class VueMesAnnonces extends VBox {
                         d.typeLocation() != null ? d.typeLocation().id() : null,
                         d.quartier() != null && d.quartier().ville() != null
                                 ? d.quartier().ville().id() : null,
-                        villeAffichee, quartierCible);
+                        quartierCible, villeAffichee);
             });
         } else {
             chargerReferentiels(typeCombo, villeCombo, quartierCombo, null, null,
-                    villeAffichee, quartierCible);
+                    quartierCible, villeAffichee);
         }
 
         Label erreurSaisie = new Label();
@@ -516,14 +491,12 @@ public class VueMesAnnonces extends VBox {
         }
     }
 
-    /** Charge types + villes et preslectionne ceux de l'annonce (null = creation).
-     *  `villeAffichee` / `quartierCible` sont les memoriaux du formulaire ouvert :
-     *  ils evitent un double chargement de quartiers via setOnAction. */
+    /** Charge types + villes et preslectionne ceux de l'annonce (null = creation). */
     private void chargerReferentiels(ComboBox<TypeLocationResponse> typeCombo,
                                      ComboBox<VilleResponse> villeCombo,
                                      ComboBox<QuartierResponse> quartierCombo,
                                      Long typeId, Long villeId,
-                                     Long[] villeAffichee, Long[] quartierCible) {
+                                     Long[] quartierCible, Long[] villeAffichee) {
         app.appeler(api::typesLocation, types -> {
             typeCombo.getItems().setAll(types);
             if (typeId != null) {
@@ -538,11 +511,13 @@ public class VueMesAnnonces extends VBox {
                 // on force le chargement des quartiers avec le quartier cible.
                 villes.stream().filter(v -> villeId.equals(v.id())).findFirst()
                         .ifPresent(v -> {
-                            // Marquer AVANT select() : si onAction se declenche, le
-                            // garde de l'ecouteur l'ignore et il n'y a pas de doublon.
-                            villeAffichee[0] = v.id();
                             villeCombo.getSelectionModel().select(v);
-                            chargerQuartiers(villeCombo, quartierCombo, quartierCible[0]);
+                            // setOnAction peut avoir charge les quartiers pendant la selection.
+                            // Si ce n'est pas le cas, on les charge explicitement une seule fois.
+                            if (villeAffichee[0] == null || !villeAffichee[0].equals(v.id())) {
+                                villeAffichee[0] = v.id();
+                                chargerQuartiers(villeCombo, quartierCombo, quartierCible[0]);
+                            }
                         });
             } else if (!villes.isEmpty()) {
                 villeCombo.getSelectionModel().select(0);
