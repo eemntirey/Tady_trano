@@ -1,10 +1,12 @@
 # Tady Trano : analyse du projet
 
-**Auteur : Jhonny (v1.0) · Mise à jour v1.1 · 19 octobre 2026**
+**Auteur : Jhonny (v1.0) · Mise à jour v1.2 · 19 octobre 2026**
 
-Analyse d'origine réalisée sur le dépôt à jour (7 commits, patch CSS inclus), sans exécution.
-**v1.1** : mise à jour après les patches 3.1 → 3.4, la correction du dialecte Hibernate et
-l'extension des gardes de réponses périmées ; ajout des tests du point 3.6.
+État documentaire actualisé après la PR #1 (fusionnée dans `main`) et la préparation de la
+PR sécurité : configuration commune sans secrets/identifiants de secours, migration V4 de
+désactivation des comptes de démonstration persistants, et vérification CI prévue pour les
+variables de démarrage obligatoires. Les résultats définitifs de la CI de la PR sécurité
+restent à consulter avant fusion.
 
 ## 1. Vue d'ensemble
 
@@ -12,7 +14,7 @@ l'extension des gardes de réponses périmées ; ajout des tests du point 3.6.
 |---|---|
 | **API** | 59 fichiers Java, ~2 198 lignes (`src/main/java`, recomptées — méthode différente de la v1.0) |
 | **Client** | 35 fichiers Java, ~2 325 lignes (4 fichiers supprimés par le patch 3.1) |
-| **Tests** | **34 au total : 28 API** (19 annonces + 9 authentification) + 6 client (lecture JSON) |
+| **Tests** | **39 au total : 31 API** (20 annonces/recherche + 11 authentification) + 8 client (lecture JSON) |
 
 - Les fonctionnalités F1 à F10 du cahier des charges sont toutes présentes.
 - Le client utilise le nouveau CSS : plus aucun `setStyle` résiduel (les 2 relevés en v1.0
@@ -69,7 +71,8 @@ suffisant jusqu'à quelques milliers d'annonces (mesuré en 3.6).
 - Il reste à ajouter : tests directs des services (jamais écrits).
 
 ### 3.7 Lisibilité — ⬜ en attente
-`VueMesAnnonces` fait toujours 404 lignes : à découper en plusieurs classes.
+`VueMesAnnonces` fait toujours environ 504 lignes (`wc -l`) : à découper en plusieurs classes,
+dans une PR dédiée sans changement de comportement.
 
 ## 4. Corrigé en dehors des points 3.x
 
@@ -88,17 +91,37 @@ suffisant jusqu'à quelques milliers d'annonces (mesuré en 3.6).
 | Tri par distance (Haversine complet) | **136 ms** | 2 000 ms |
 | Filtre tranche de prix | **53 ms** | 2 000 ms |
 
-**34 tests verts** (`mvn test`, BUILD SUCCESS) : 28 API + 6 client.
+**39 tests attendus après le correctif sécurité** : 31 API + 8 client. Le statut réel de la CI de cette branche est la référence avant fusion.
 
-## 6. Reporté (usage local) — inchangé
+## 6. Sécurité et risques résiduels
 
-- secret JWT par défaut dans `application.yml` ;
-- comptes de démo de la migration V2 ;
-- photos ajoutées par URL ;
-- absence de limitation des tentatives de connexion.
+### 6.1 Démarrage et secrets
+
+- La configuration commune (`application.yml`) n'a plus de défaut pour `DB_URL`, `DB_USER`,
+  `DB_PASSWORD` ni `JWT_SECRET` : hors des profils `local` et `test`, leur absence doit
+  empêcher le démarrage. Le profil `local` garde ses valeurs de développement avec H2 volatile.
+- Les détails d'erreur serveur sont masqués par défaut (`server.error.include-message: never`) ;
+  `local` et `test` peuvent les afficher pour le diagnostic.
+- Les comptes de démonstration V2 sont désactivés par la nouvelle migration V4 sur les bases
+  persistantes. V2 n'est pas modifiée afin de préserver le checksum Flyway des installations
+  existantes. La désactivation ne supprime aucune donnée.
+
+### 6.2 Points toujours ouverts avant production
+
+- V2 insère aussi des profils, annonces et photos fictifs : V4 désactive les comptes connus,
+  mais ne purge pas ces données. Les examiner et les masquer/nettoyer avant une mise en ligne.
+- Limitation des tentatives de connexion (rate-limit / temporisation anti-abus).
+- Photos ajoutées par URL : pas encore de téléversement maîtrisé avec contrôle du type, taille
+  et contenu.
+- HTTPS, gestion des secrets et droits minimaux du compte MySQL restent à configurer dans
+  l'environnement de déploiement.
+- Les tests directs des services métier ne sont pas encore présents.
+- Le pré-filtre géographique (3.5) et le découpage de `VueMesAnnonces` (3.7) restent reportés.
 
 ## 7. Prochaine étape
 
-1. Vérifier le démarrage local MySQL (ligne `Database dialect:` + Flyway + `validate`).
-2. Point 3.5 (pré-filtre zone rectangulaire) si le volume dépasse quelques milliers d'annonces.
-3. Point 3.7 (découpe de `VueMesAnnonces`) et tests directs des services.
+1. Après fusion de la PR sécurité, confirmer au premier démarrage MySQL : dialecte détecté,
+   migrations Flyway V1–V4, `ddl-auto=validate`, et variables obligatoires présentes.
+2. Ajouter des tests directs des services pour modération, verrou de statut et favoris.
+3. Découper `VueMesAnnonces` dans une PR distincte.
+4. Envisager l'optimisation géographique uniquement après accord sur le contrat de recherche.
