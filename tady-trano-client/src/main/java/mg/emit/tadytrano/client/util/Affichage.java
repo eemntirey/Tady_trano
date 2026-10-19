@@ -248,8 +248,7 @@ public final class Affichage {
         }
     }
 
-    private static final class SuiviChargement
-            implements ChangeListener<Number>, ChangeListener<Boolean> {
+    private static final class SuiviChargement {
 
         private final ImageView vue;
         private final Image image;
@@ -257,6 +256,10 @@ public final class Affichage {
         private final String cle;
         private final long generation;
         private boolean termine;
+        private final ChangeListener<Number> ecouteProgression =
+                (observable, ancien, nouveau) -> verifier();
+        private final ChangeListener<Boolean> ecouteErreur =
+                (observable, ancien, nouveau) -> verifier();
 
         private SuiviChargement(ImageView vue, Image image, Image placeholder,
                                 String cle, long generation) {
@@ -268,18 +271,8 @@ public final class Affichage {
         }
 
         private void attacher() {
-            image.progressProperty().addListener(this);
-            image.errorProperty().addListener(this);
-            verifier();
-        }
-
-        @Override
-        public void changed(ObservableValue<? extends Number> observable, Number ancien, Number nouveau) {
-            verifier();
-        }
-
-        @Override
-        public void changed(ObservableValue<? extends Boolean> observable, Boolean ancien, Boolean nouveau) {
+            image.progressProperty().addListener(ecouteProgression);
+            image.errorProperty().addListener(ecouteErreur);
             verifier();
         }
 
@@ -299,8 +292,8 @@ public final class Affichage {
                 return;
             }
             termine = true;
-            image.progressProperty().removeListener(this);
-            image.errorProperty().removeListener(this);
+            image.progressProperty().removeListener(ecouteProgression);
+            image.errorProperty().removeListener(ecouteErreur);
 
             if (!succes) {
                 retirerImageEnErreur(cle, image);
