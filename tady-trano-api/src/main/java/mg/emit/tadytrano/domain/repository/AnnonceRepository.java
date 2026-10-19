@@ -4,6 +4,7 @@ import mg.emit.tadytrano.domain.model.Annonce;
 import mg.emit.tadytrano.domain.model.StatutAnnonce;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,13 +20,17 @@ public interface AnnonceRepository extends JpaRepository<Annonce, Long> {
      * Si une position (lat, lng) est fournie, les annonces sont triees par distance
      * croissante (formule de Haversine), les annonces sans coordonnees passant en
      * dernier ; sinon le tri se fait par date de publication decroissante.
+     * quartier, ville et typeLocation sont fetchees avec l'annonce (JOIN FETCH) :
+     * une seule requete pour les resumes, pas de N+1 ; le comptage utilise une
+     * requete dediee sans fetch.
      */
-    @Query("""
+    @Query(value = """
             SELECT a FROM Annonce a
-            JOIN a.quartier q
-            JOIN q.ville v
+            JOIN FETCH a.quartier q
+            JOIN FETCH q.ville v
+            JOIN FETCH a.typeLocation t
             WHERE a.statut = :statut
-              AND (:typeLocationId IS NULL OR a.typeLocation.id = :typeLocationId)
+              AND (:typeLocationId IS NULL OR t.id = :typeLocationId)
               AND (:quartierId IS NULL OR q.id = :quartierId)
               AND (:villeId IS NULL OR v.id = :villeId)
               AND (:prixMin IS NULL OR a.prix >= :prixMin)
@@ -40,6 +45,19 @@ public interface AnnonceRepository extends JpaRepository<Annonce, Long> {
                              sin(radians(:lat)) * sin(radians(a.latitude)))))
                      END,
                      a.datePublication DESC
+            """,
+            countQuery = """
+            SELECT count(a) FROM Annonce a
+            JOIN a.quartier q
+            JOIN q.ville v
+            WHERE a.statut = :statut
+              AND (:typeLocationId IS NULL OR a.typeLocation.id = :typeLocationId)
+              AND (:quartierId IS NULL OR q.id = :quartierId)
+              AND (:villeId IS NULL OR v.id = :villeId)
+              AND (:prixMin IS NULL OR a.prix >= :prixMin)
+              AND (:prixMax IS NULL OR a.prix <= :prixMax)
+              AND (:nbPiecesMin IS NULL OR a.nbPieces >= :nbPiecesMin)
+              AND (:nbPiecesMax IS NULL OR a.nbPieces <= :nbPiecesMax)
             """)
     Page<Annonce> rechercher(@Param("statut") StatutAnnonce statut,
                              @Param("typeLocationId") Long typeLocationId,
@@ -55,12 +73,21 @@ public interface AnnonceRepository extends JpaRepository<Annonce, Long> {
 
     List<Annonce> findByProprietaireIdOrderByDatePublicationDesc(Long proprietaireId);
 
+    @EntityGraph(attributePaths = {"typeLocation", "quartier", "quartier.ville"})
     Page<Annonce> findByProprietaireIdOrderByDatePublicationDesc(Long proprietaireId, Pageable pageable);
 
     Optional<Annonce> findByIdAndProprietaireId(Long id, Long proprietaireId);
 
     // Pour l'administration (F10)
+    @EntityGraph(attributePaths = {"typeLocation", "quartier", "quartier.ville"})
     Page<Annonce> findByStatutOrderByDatePublicationDesc(StatutAnnonce statut, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"typeLocation", "quartier", "quartier.ville"})
     Page<Annonce> findAllByOrderByDatePublicationDesc(Pageable pageable);
+
+    /** Charge les annonces par ids en une seule requete (favoris) : les associations
+     *  lues par le resume sont fetchees pour eviter le N+1. */
+    @Override
+    @EntityGraph(attributePaths = {"typeLocation", "quartier", "quartier.ville"})
+    List<Annonce> findAllById(Iterable<Long> ids);
 }

@@ -52,6 +52,11 @@ public class VueRecherche extends VBox {
 
     private int page = 0;
     private int totalPages = 0;
+    /** Numero de sequence des recherches : permet d'ignorer les reponses perimees
+     *  (filtre ou page change depuis le lancement de la requete). */
+    private int generation = 0;
+    /** Meme principe pour le chargement des quartiers d'une ville. */
+    private int generationQuartiers = 0;
 
     public VueRecherche(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -169,12 +174,16 @@ public class VueRecherche extends VBox {
     }
 
     private void chargerQuartiers() {
+        final int gen = ++generationQuartiers;
         VilleResponse selection = ville.getValue();
         quartier.getItems().clear();
         if (selection == null) {
             return;
         }
         app.appeler(() -> api.quartiers(selection.id()), quartiers -> {
+            if (gen != generationQuartiers) {
+                return; // ville changee depuis : reponse perimee
+            }
             quartier.getItems().setAll(quartiers);
             quartier.getItems().add(0, null);
         });
@@ -209,15 +218,27 @@ public class VueRecherche extends VBox {
         }
 
         Map<String, String> finaux = filtres;
-        app.appeler(() -> api.rechercher(finaux, page, TAILLE), reponse -> {
-            totalPages = reponse.totalPages();
-            pageLabel.setText(reponse.totalPages() == 0
-                    ? "Aucun resultat"
-                    : "Page " + (reponse.page() + 1) + " / " + reponse.totalPages());
-            precedent.setDisable(reponse.page() <= 0);
-            suivant.setDisable(reponse.page() >= reponse.totalPages() - 1);
-            afficher(reponse.contenu());
-        });
+        final int pageDemandee = page;
+        final int gen = ++generation;
+        app.appeler(() -> api.rechercher(finaux, pageDemandee, TAILLE),
+                reponse -> {
+                    if (gen != generation) {
+                        return; // reponse perimee : une recherche plus recente a ete lancee
+                    }
+                    totalPages = reponse.totalPages();
+                    pageLabel.setText(reponse.totalPages() == 0
+                            ? "Aucun resultat"
+                            : "Page " + (reponse.page() + 1) + " / " + reponse.totalPages());
+                    precedent.setDisable(reponse.page() <= 0);
+                    suivant.setDisable(reponse.page() >= reponse.totalPages() - 1);
+                    afficher(reponse.contenu());
+                },
+                erreur -> {
+                    if (gen != generation) {
+                        return; // erreur d'une recherche perimee : ignoree egalement
+                    }
+                    app.gererErreur(erreur);
+                });
     }
 
     private void afficher(List<AnnonceResumeResponse> annonces) {

@@ -7,13 +7,24 @@ import mg.emit.tadytrano.client.api.ErreurApi;
 
 import java.math.BigDecimal;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /** Aides d'affichage partagees par toutes les vues. */
 public final class Affichage {
 
-    private static final Map<String, Image> CACHE_IMAGES = new ConcurrentHashMap<>();
+    /** Nombre maximal d'images conservees en memoire (eviction LRU). */
+    private static final int TAILLE_CACHE_MAX = 100;
+
+    /** Cache d'image borne en nombre d'entrees, en ordre d'acces (LRU), synchronise. */
+    private static final Map<String, Image> CACHE_IMAGES =
+            Collections.synchronizedMap(new LinkedHashMap<String, Image>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Image> eldest) {
+                    return size() > TAILLE_CACHE_MAX;
+                }
+            });
 
     private Affichage() {
     }
@@ -39,7 +50,8 @@ public final class Affichage {
         return km == null ? null : String.format("%.1f km", km);
     }
 
-    /** Vignette d'image distante avec cache memoire ; placeholder vide si l'URL echoue. */
+    /** Vignette d'image distante, decodee a la taille demandee (et non en taille
+     *  reelle), avec cache memoire LRU borne ; placeholder vide si l'URL echoue. */
     public static ImageView vignette(String url, double largeur, double hauteur) {
         ImageView vue = new ImageView();
         vue.setFitWidth(largeur);
@@ -47,7 +59,9 @@ public final class Affichage {
         vue.setPreserveRatio(true);
         if (url != null && !url.isBlank()) {
             try {
-                Image image = CACHE_IMAGES.computeIfAbsent(url, u -> new Image(u, true));
+                String cle = url + "|" + (int) largeur + "x" + (int) hauteur;
+                Image image = CACHE_IMAGES.computeIfAbsent(cle,
+                        k -> new Image(url, largeur, hauteur, true, true, true));
                 vue.setImage(image);
             } catch (RuntimeException ignore) {
                 // image indisponible : on garde la vignette vide
