@@ -302,6 +302,13 @@ public class AnnonceService {
         favoriRepository.save(favori);
     }
 
+    /** Vrai si l'annonce est en favori pour l'utilisateur, quel que soit son statut
+     *  (une annonce LOUEE reste en favori meme si elle n'est plus dans les listes). */
+    @Transactional(readOnly = true)
+    public boolean estFavori(Long utilisateurId, Long annonceId) {
+        return favoriRepository.findByUtilisateurIdAndAnnonceId(utilisateurId, annonceId).isPresent();
+    }
+
     @Transactional
     public void retirerFavori(Long utilisateurId, Long annonceId) {
         Favori favori = favoriRepository.findByUtilisateurIdAndAnnonceId(utilisateurId, annonceId)

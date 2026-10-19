@@ -37,6 +37,13 @@ public class FavoriController {
         return annonceService.mesFavoris(utilisateurCourant.utilisateurId(principal), page, taille);
     }
 
+    @GetMapping("/{annonceId}")
+    @PreAuthorize("isAuthenticated()")
+    public boolean estFavori(@AuthenticationPrincipal UserDetails principal,
+                             @PathVariable Long annonceId) {
+        return annonceService.estFavori(utilisateurCourant.utilisateurId(principal), annonceId);
+    }
+
     @PostMapping("/{annonceId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> ajouter(@AuthenticationPrincipal UserDetails principal,

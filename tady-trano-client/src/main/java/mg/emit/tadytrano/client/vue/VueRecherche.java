@@ -8,6 +8,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -52,6 +53,9 @@ public class VueRecherche extends VBox {
     private final ComboBox<TypeLocationResponse> type = new ComboBox<>();
     private final ComboBox<Integer> nbPiecesMin = new ComboBox<>();
     private final ComboBox<Integer> nbPiecesMax = new ComboBox<>();
+    /** Tri par distance depuis le quartier selectionne (position de reference, D3). */
+    private final ToggleButton proximite = new ToggleButton("Autour du quartier");
+    private final Button lancer = new Button("Rechercher");
     private final CurseurPlage prix = new CurseurPlage(PRIX_MIN, PRIX_MAX, PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT, PAS_PRIX);
     private final Label prixBas = new Label();
     private final Label prixHaut = new Label();
@@ -174,7 +178,6 @@ public class VueRecherche extends VBox {
 
         // --- pastilles de filtres rapides + actions ---
         pastilles.getStyleClass().add("chips-row");
-        Button lancer = new Button("Rechercher");
         lancer.setDefaultButton(true);
         lancer.getStyleClass().add("btn-primary-custom");
         lancer.setOnAction(e -> {
@@ -184,7 +187,18 @@ public class VueRecherche extends VBox {
         Button reinitialiser = new Button("Reinitialiser");
         reinitialiser.getStyleClass().add("btn-ghost");
         reinitialiser.setOnAction(e -> reinitialiser());
-        HBox actions = new HBox(10, reinitialiser, lancer);
+
+        // D3 : position de reference = quartier selectionne (tri par distance).
+        proximite.getStyleClass().add("chip");
+        proximite.setTooltip(new Tooltip(
+                "Trier les résultats par distance depuis le quartier sélectionné."));
+        proximite.setDisable(true);
+        proximite.setOnAction(e -> {
+            page = 0;
+            rechercher();
+        });
+
+        HBox actions = new HBox(10, reinitialiser, proximite, lancer);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         HBox lignePastilles = new HBox(12, pastilles, actions);
@@ -196,6 +210,9 @@ public class VueRecherche extends VBox {
         prix.basProperty().addListener((o, a, b) -> majEtiquettesPrix());
         prix.hautProperty().addListener((o, a, b) -> majEtiquettesPrix());
         majEtiquettesPrix();
+        // Disponibilite du tri « Autour du quartier » (aussi pour les selections
+        // programmatiques qui ne declencheraient pas onAction).
+        localisation.valueProperty().addListener((o, a, b) -> majProximite());
 
         localisation.setOnAction(e -> {
             page = 0;
@@ -365,6 +382,7 @@ public class VueRecherche extends VBox {
         type.setValue(null);
         nbPiecesMin.setValue(null);
         nbPiecesMax.setValue(null);
+        proximite.setSelected(false);
         prix.reinitialiser(PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT);
         deselecterSauf(pastillesType, null);
         deselecterSauf(pastillesQuartier, null);
@@ -387,7 +405,10 @@ public class VueRecherche extends VBox {
                 filtres.put("villeId", String.valueOf(ville.id()));
             } else if (quartier != null) {
                 filtres.put("quartierId", String.valueOf(quartier.id()));
-                if (quartier.latitude() != null && quartier.longitude() != null) {
+                // D3 : position de reference = centre du quartier, uniquement
+                // si l'utilisateur a active le tri « Autour du quartier ».
+                if (proximite.isSelected()
+                        && quartier.latitude() != null && quartier.longitude() != null) {
                     filtres.put("lat", String.valueOf(quartier.latitude()));
                     filtres.put("lng", String.valueOf(quartier.longitude()));
                 }
@@ -412,11 +433,13 @@ public class VueRecherche extends VBox {
         Map<String, String> finaux = filtres;
         final int pageDemandee = page;
         final int gen = ++generation;
+        lancer.setDisable(true); // anti double-clic : un seul appel en vol (D7)
         app.appeler(() -> api.rechercher(finaux, pageDemandee, TAILLE),
                 reponse -> {
                     if (gen != generation) {
                         return; // reponse perimee : une recherche plus recente a ete lancee
                     }
+                    lancer.setDisable(false);
                     totalPages = reponse.totalPages();
                     pageLabel.setText(reponse.totalPages() == 0
                             ? "Aucun resultat"
@@ -429,8 +452,29 @@ public class VueRecherche extends VBox {
                     if (gen != generation) {
                         return; // erreur d'une recherche perimee : ignoree egalement
                     }
+                    lancer.setDisable(false);
                     app.gererErreur(erreur);
                 });
+    }
+
+    /** Quartier selectionne dans le champ localisation (null si ville ou rien). */
+    private QuartierResponse quartierSelectionne() {
+        String lieu = localisation.getValue() == null ? "" : localisation.getValue().trim();
+        if (lieu.isEmpty() || villesParNom.containsKey(cle(lieu))) {
+            return null;
+        }
+        return quartiersParNom.get(cle(lieu));
+    }
+
+    /** Le tri « Autour du quartier » n'a de sens que sur un quartier avec coordonnees. */
+    private void majProximite() {
+        QuartierResponse quartier = quartierSelectionne();
+        boolean disponible = quartier != null
+                && quartier.latitude() != null && quartier.longitude() != null;
+        proximite.setDisable(!disponible);
+        if (!disponible && proximite.isSelected()) {
+            proximite.setSelected(false);
+        }
     }
 
     private static String cle(String texte) {
@@ -484,7 +528,8 @@ public class VueRecherche extends VBox {
             badges.getChildren().add(typeBadge);
         }
         if (annonce.distanceKm() != null) {
-            Label distance = new Label(Affichage.distance(annonce.distanceKm()) + " de vous");
+            // distanceKm n'est renseigne que si un repere (quartier) a ete fourni.
+            Label distance = new Label(Affichage.distance(annonce.distanceKm()) + " du quartier");
             distance.getStyleClass().add("badge-distance");
             badges.getChildren().add(distance);
         }

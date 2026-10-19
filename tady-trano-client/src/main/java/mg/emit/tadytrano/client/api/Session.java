@@ -18,6 +18,19 @@ public class Session {
         this.jeton = jeton;
         this.profil = profil;
         this.connecte.set(true);
+        majRoles(profil);
+    }
+
+    /** Rafraichit le profil sans toucher au jeton (GET /api/auth/me). */
+    public void majProfil(ProfilResponse profil) {
+        if (profil == null || !estConnecte()) {
+            return;
+        }
+        this.profil = profil;
+        majRoles(profil);
+    }
+
+    private void majRoles(ProfilResponse profil) {
         this.admin.set("ADMIN".equals(profil == null ? null : profil.role()));
         this.proprietaire.set("PROPRIETAIRE".equals(profil == null ? null : profil.role()));
     }

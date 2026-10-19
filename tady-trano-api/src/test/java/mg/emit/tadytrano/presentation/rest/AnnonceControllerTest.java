@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -506,5 +507,78 @@ class AnnonceControllerTest extends AnnonceTestSupport {
     void requeteProtegeeSansJetonRenvoie401() throws Exception {
         mockMvc.perform(get("/api/admin/annonces"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ------------------------------------------------------------------
+    // Audit D5 / D6 : presence en favori et validation de la modification
+    // ------------------------------------------------------------------
+
+    @Test
+    void presenceEnFavoriViaEndpointDedieMemeAnnonceLouee() throws Exception {
+        String jetonProprio = proprietaireConnecte();
+        Long typeLocationId = typeLocationId();
+        Long quartierId = jdbc.queryForObject("SELECT id FROM quartier LIMIT 1", Long.class);
+        mockMvc.perform(post("/api/annonces")
+                        .header("Authorization", "Bearer " + jetonProprio)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(annonceJson(typeLocationId, quartierId)))
+                .andExpect(status().isCreated());
+        Long annonceId = jdbc.queryForObject("SELECT id FROM annonce", Long.class);
+
+        String jetonLocataire = inscrire(emailUnique(), Role.LOCATAIRE);
+
+        // Sans jeton : 401 (comme les autres routes /api/favoris)
+        mockMvc.perform(get("/api/favoris/" + annonceId))
+                .andExpect(status().isUnauthorized());
+
+        // Pas encore en favori
+        mockMvc.perform(get("/api/favoris/" + annonceId)
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(false));
+
+        // Ajout, puis presence confirmee
+        mockMvc.perform(post("/api/favoris/" + annonceId)
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isCreated());
+        mockMvc.perform(get("/api/favoris/" + annonceId)
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(true));
+
+        // L'annonce passe a LOUEE : elle sort des listes, mais le test de
+        // presence doit rester exact (c'est le bug D5).
+        mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonProprio)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"LOUEE\"}"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/annonces"))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mockMvc.perform(get("/api/favoris/" + annonceId)
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(true));
+    }
+
+    @Test
+    void modificationAvecTitreVideRenvoie400() throws Exception {
+        String jeton = proprietaireConnecte();
+        Long typeLocationId = typeLocationId();
+        Long quartierId = jdbc.queryForObject("SELECT id FROM quartier LIMIT 1", Long.class);
+        mockMvc.perform(post("/api/annonces")
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(annonceJson(typeLocationId, quartierId)))
+                .andExpect(status().isCreated());
+        Long annonceId = jdbc.queryForObject("SELECT id FROM annonce", Long.class);
+
+        String titreVide = annonceJson(typeLocationId, quartierId)
+                .replace("\"titre\": \"Studio centre-ville\"", "\"titre\": \"   \"");
+        mockMvc.perform(put("/api/annonces/" + annonceId)
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titreVide))
+                .andExpect(status().isBadRequest());
     }
 }

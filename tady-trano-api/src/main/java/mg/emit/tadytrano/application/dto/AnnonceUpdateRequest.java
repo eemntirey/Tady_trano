@@ -4,6 +4,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -16,7 +17,7 @@ import java.math.BigDecimal;
 public record AnnonceUpdateRequest(
         @NotNull Long typeLocationId,
         @NotNull Long quartierId,
-        @NotNull @Size(max = 150) String titre,
+        @NotNull @NotBlank @Size(max = 150) String titre,
         @Size(max = 2000) String description,
         @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 10, fraction = 2) BigDecimal prix,
         @Min(0) Integer surface,

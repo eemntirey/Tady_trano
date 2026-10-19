@@ -113,13 +113,13 @@ Swagger UI : <http://localhost:8081/swagger-ui.html>
 
 | Endpoint | Accès | Description |
 |---|---|---|
-| `/api/auth/inscription`, `/api/auth/connexion` | Public | Création de compte et connexion (jeton JWT) |
+| `/api/auth/inscription`, `/api/auth/connexion`, `GET /api/auth/me` | Public | Création de compte, connexion (jeton JWT) et profil à jour de l'utilisateur connecté |
 | `GET /api/annonces`, `/api/annonces/{id}` | Public | Recherche avec filtres, tri par distance (`lat`, `lng`), pagination ; détail (annonces `ACTIVE` seulement) |
 | `POST`, `PUT`, `PATCH`, `DELETE /api/annonces/...` | Propriétaire | Gestion de ses annonces et de leurs photos |
-| `/api/favoris` | Connecté | Ajout, retrait et liste des favoris |
+| `/api/favoris`, `GET /api/favoris/{annonceId}` | Connecté | Ajout, retrait, liste des favoris et test de présence d'une annonce en favori |
 | `/api/proprietaires` | Propriétaire | Profil du propriétaire ou de l'agence |
 | `/api/admin/annonces` | Administrateur | Liste de toutes les annonces et modération |
-| `/api/villes`, `/api/quartiers`, `/api/types-location` | Public | Référentiels |
+| `/api/villes`, `/api/villes/{villeId}/quartiers`, `/api/types-location` | Public | Référentiels |
 
 Les routes protégées attendent l'en-tête `Authorization: Bearer <jeton>`.
 

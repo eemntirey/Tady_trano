@@ -131,25 +131,36 @@ public class VueConnexion extends VBox {
             erreur.setText("Email et mot de passe obligatoires");
             return;
         }
+        if (inscription.isSelected() && (nom.getText().isBlank() || prenom.getText().isBlank())) {
+            erreur.setText("Nom et prénom obligatoires");
+            return;
+        }
+        if (valider.isDisable()) {
+            return; // anti double-clic : un seul appel en vol (D7)
+        }
+        valider.setDisable(true);
         if (inscription.isSelected()) {
-            if (nom.getText().isBlank() || prenom.getText().isBlank()) {
-                erreur.setText("Nom et prénom obligatoires");
-                return;
-            }
             String roleChoisi = roleProprio.isSelected() ? "PROPRIETAIRE" : "LOCATAIRE";
             RegisterRequest demande = new RegisterRequest(adresse, secret,
                     nom.getText().trim(), prenom.getText().trim(), roleChoisi);
             Travailleur.faire(() -> api.inscription(demande),
-                    reponse -> app.apresAuthentification(reponse),
+                    reponse -> {
+                        valider.setDisable(false);
+                        app.apresAuthentification(reponse);
+                    },
                     this::afficherErreur);
         } else {
             Travailleur.faire(() -> api.connexion(new LoginRequest(adresse, secret)),
-                    reponse -> app.apresAuthentification(reponse),
+                    reponse -> {
+                        valider.setDisable(false);
+                        app.apresAuthentification(reponse);
+                    },
                     this::afficherErreur);
         }
     }
 
     private void afficherErreur(Exception e) {
+        valider.setDisable(false);
         Affichage.erreur(e);
         erreur.setText(e.getMessage());
     }

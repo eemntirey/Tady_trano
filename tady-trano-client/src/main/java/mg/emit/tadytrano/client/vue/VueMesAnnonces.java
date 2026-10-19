@@ -63,14 +63,14 @@ public class VueMesAnnonces extends VBox {
         nouvelleAnnonce.getStyleClass().add("btn-success-custom");
         // Le serveur exige le role PROPRIETAIRE pour POST /api/annonces :
         // on bloque tot avec un message clair au lieu du 403.
-        nouvelleAnnonce.setOnAction(e -> {
+        nouvelleAnnonce.setOnAction(e -> uneFois(nouvelleAnnonce, () -> {
             if (!app.estProprietaire()) {
                 Affichage.erreur(new RuntimeException(
                         "La publication est réservée aux comptes Propriétaire."));
                 return;
             }
             ouvrirFormulaire(null);
-        });
+        }));
 
         enTete.getChildren().addAll(titre, espace, nouvelleAnnonce);
 
@@ -193,13 +193,13 @@ public class VueMesAnnonces extends VBox {
 
         // Actions
         Button photosBtn = new Button("Photos");
-        photosBtn.setOnAction(e -> ouvrirGestionPhotos(a.id()));
+        photosBtn.setOnAction(e -> uneFois(photosBtn, () -> ouvrirGestionPhotos(a.id())));
 
         Button statutBtn = new Button("Statut");
         statutBtn.setOnAction(e -> ouvrirChangementStatut(a, statutBtn));
 
         Button modifierBtn = new Button("Modifier");
-        modifierBtn.setOnAction(e -> ouvrirFormulaire(a.id()));
+        modifierBtn.setOnAction(e -> uneFois(modifierBtn, () -> ouvrirFormulaire(a.id())));
 
         Button supprimerBtn = new Button("Supprimer");
         supprimerBtn.getStyleClass().add("btn-danger-custom");
@@ -212,52 +212,77 @@ public class VueMesAnnonces extends VBox {
         return ligne;
     }
 
+    /** Anti double-clic (D7) : le bouton est desactive pendant l'ouverture de la
+     *  fenetre modale ; le second clic filtre tant qu'elle est ouverte. */
+    private void uneFois(Button bouton, Runnable action) {
+        if (bouton.isDisable()) {
+            return;
+        }
+        bouton.setDisable(true);
+        try {
+            action.run();
+        } finally {
+            bouton.setDisable(false);
+        }
+    }
+
     private void ouvrirChangementStatut(AnnonceResumeResponse a, Button bouton) {
+        if (bouton.isDisable()) {
+            return; // anti double-clic : une seule fenetre / un seul appel en vol
+        }
+        bouton.setDisable(true);
         ChoiceDialog<String> dialog = new ChoiceDialog<>(a.statut(), "ACTIVE", "LOUEE", "MASQUEE");
         dialog.setTitle("Statut de l'annonce");
         dialog.setHeaderText("Modifier le statut de : " + a.titre());
         dialog.setContentText("Nouveau statut :");
 
         Optional<String> res = dialog.showAndWait();
-        res.ifPresent(nouveauStatut -> {
-            bouton.setDisable(true);
-            app.appeler(() -> {
-                api.changerStatutAnnonce(a.id(), new StatutAnnonceRequest(nouveauStatut));
-                return null;
-            },
-            r -> {
-                charger();
-                Affichage.succes("Statut mis à jour : " + nouveauStatut + ".");
-            },
-            err -> {
-                bouton.setDisable(false);
-                app.gererErreur(err);
-            });
+        if (res.isEmpty()) {
+            bouton.setDisable(false);
+            return;
+        }
+        String nouveauStatut = res.get();
+        app.appeler(() -> {
+            api.changerStatutAnnonce(a.id(), new StatutAnnonceRequest(nouveauStatut));
+            return null;
+        },
+        r -> {
+            charger(); // la liste est reconstruite : le bouton part avec l'ancienne ligne
+            Affichage.succes("Statut mis à jour : " + nouveauStatut + ".");
+        },
+        err -> {
+            bouton.setDisable(false);
+            app.gererErreur(err);
         });
     }
 
     private void confirmerSuppression(AnnonceResumeResponse a, Button bouton) {
+        if (bouton.isDisable()) {
+            return; // anti double-clic : une seule fenetre / un seul appel en vol
+        }
+        bouton.setDisable(true);
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Confirmation de suppression");
         alert.setHeaderText("Supprimer l'annonce : " + a.titre() + " ?");
         alert.setContentText("Cette action supprimera définitivement l'annonce ainsi que ses photos.");
 
         Optional<ButtonType> res = alert.showAndWait();
-        if (res.isPresent() && res.get() == ButtonType.OK) {
-            bouton.setDisable(true);
-            app.appeler(() -> {
-                api.supprimerAnnonce(a.id());
-                return null;
-            },
-            r -> {
-                charger();
-                Affichage.succes("Annonce supprimée.");
-            },
-            err -> {
-                bouton.setDisable(false);
-                app.gererErreur(err);
-            });
+        if (res.isEmpty() || res.get() != ButtonType.OK) {
+            bouton.setDisable(false);
+            return;
         }
+        app.appeler(() -> {
+            api.supprimerAnnonce(a.id());
+            return null;
+        },
+        r -> {
+            charger();
+            Affichage.succes("Annonce supprimée.");
+        },
+        err -> {
+            bouton.setDisable(false);
+            app.gererErreur(err);
+        });
     }
 
     private void ouvrirFormulaire(Long idModification) {

@@ -181,7 +181,22 @@ public class VueProfil extends VBox {
             }
         });
 
-        mg.emit.tadytrano.client.dto.ProfilResponse profil = app.profilCourant();
+        // Profil desature depuis /api/auth/me (donnees du jeton potentiellement
+        // perimees : role, nom...) ; repli sur le cache local si l'API repond en erreur.
+        app.appeler(api::moi, profil -> {
+            app.majProfilCourant(profil);
+            afficherProfil(profil);
+        }, err -> {
+            mg.emit.tadytrano.client.dto.ProfilResponse cache = app.profilCourant();
+            if (cache != null) {
+                afficherProfil(cache);
+            } else {
+                app.gererErreur(err);
+            }
+        });
+    }
+
+    private void afficherProfil(mg.emit.tadytrano.client.dto.ProfilResponse profil) {
         if (profil == null) {
             return;
         }

@@ -64,6 +64,11 @@ public class ApiClient {
         return post("/api/auth/inscription", demande, AuthResponse.class);
     }
 
+    /** Profil a jour de l'utilisateur connecte (roles inclus). */
+    public ProfilResponse moi() {
+        return get("/api/auth/me", ProfilResponse.class);
+    }
+
     // ------------------------------------------------------------------
     // Referentiel
     // ------------------------------------------------------------------
@@ -138,20 +143,11 @@ public class ApiClient {
 
     /**
      * Vrai si l'annonce figure parmi les favoris de l'utilisateur courant.
-     * Parcourt toutes les pages (pas seulement les 50 premieres).
+     * Un endpoint dedie : le test fonctionne meme si l'annonce n'est plus
+     * dans la liste paginee (statut LOUEE, MASQUEE, page > 0...).
      */
     public boolean estEnFavori(Long annonceId) {
-        int page = 0;
-        while (true) {
-            PageResponse<FavoriResponse> reponse = mesFavoris(page, 100);
-            if (reponse.contenu().stream().anyMatch(f -> annonceId.equals(f.annonceId()))) {
-                return true;
-            }
-            page++;
-            if (page >= reponse.totalPages()) {
-                return false;
-            }
-        }
+        return get("/api/favoris/" + annonceId, Boolean.class);
     }
 
     public void ajouterFavori(Long annonceId) {

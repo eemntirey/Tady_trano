@@ -12,6 +12,9 @@ import java.time.LocalDateTime;
  *
  * distanceKm est renseigne uniquement quand la recherche a fourni une position
  * et que l'annonce possede des coordonnees ; sinon il reste null.
+ *
+ * latitude / longitude positionnent l'annonce sur la carte (CDC F7) : coordonnees
+ * de l'annonce, avec repli sur celles du quartier ; null = annonce non positionnee.
  */
 public record AnnonceResumeResponse(
         Long id,
@@ -24,10 +27,17 @@ public record AnnonceResumeResponse(
         TypeLocationResponse typeLocation,
         QuartierResponse quartier,
         String urlPhotoPrincipale,
-        Double distanceKm
+        Double distanceKm,
+        Double latitude,
+        Double longitude
 ) {
 
     public static AnnonceResumeResponse depuis(Annonce annonce, String urlPhotoPrincipale, Double distanceKm) {
+        QuartierResponse quartier = QuartierResponse.depuis(annonce.getQuartier());
+        Double latitude = annonce.getLatitude() != null ? annonce.getLatitude()
+                : (quartier == null ? null : quartier.latitude());
+        Double longitude = annonce.getLongitude() != null ? annonce.getLongitude()
+                : (quartier == null ? null : quartier.longitude());
         return new AnnonceResumeResponse(
                 annonce.getId(),
                 annonce.getTitre(),
@@ -37,8 +47,10 @@ public record AnnonceResumeResponse(
                 annonce.getStatut(),
                 annonce.getDatePublication(),
                 TypeLocationResponse.depuis(annonce.getTypeLocation()),
-                QuartierResponse.depuis(annonce.getQuartier()),
+                quartier,
                 urlPhotoPrincipale,
-                distanceKm);
+                distanceKm,
+                latitude,
+                longitude);
     }
 }

@@ -100,6 +100,18 @@ public class CarteView extends StackPane {
         }
     }
 
+    /** Retire le marqueur de position (point de repere efface). */
+    public void effacerPositionUtilisateur() {
+        if (!pageChargee) {
+            latAttente = null;
+            lngAttente = null;
+            labelAttente = null;
+            return;
+        }
+        // Cote JS, une latitude non numerique supprime le marqueur existant.
+        webEngine.executeScript("setUserLocation(null, null, '');");
+    }
+
     public void centrerSur(Double lat, Double lng, int zoom) {
         if (lat == null || lng == null
                 || !Double.isFinite(lat) || !Double.isFinite(lng)

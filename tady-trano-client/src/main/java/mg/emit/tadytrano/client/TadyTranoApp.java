@@ -196,6 +196,12 @@ public class TadyTranoApp extends Application {
         return session.profil();
     }
 
+    /** Met a jour le profil courant (roles inclus) apres un rafraichissement /api/auth/me. */
+    public void majProfilCourant(mg.emit.tadytrano.client.dto.ProfilResponse profil) {
+        session.majProfil(profil);
+        majBarre();
+    }
+
     /** Vrai si le compte courant a le role strict PROPRIETAIRE. */
     public boolean estProprietaire() {
         return session.estProprietaire();

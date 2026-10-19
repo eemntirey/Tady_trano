@@ -118,36 +118,54 @@ class ApiClientHttpTest {
     }
 
     // ------------------------------------------------------------------
-    // Favoris : pagination
+    // Favoris : endpoint de presence dedie (D5)
     // ------------------------------------------------------------------
 
     @Test
-    void estEnFavoriParcourtToutesLesPages() {
-        // Annonce 404 absente de la page 0, presente en page 1 :
-        // le client doit continuer au-dela de la premiere page.
-        reponses.put("/api/favoris#0", new Reponse(200, pageFavoris("1,2,3", 0, 2)));
-        reponses.put("/api/favoris#1", new Reponse(200, pageFavoris("404", 1, 2)));
+    void estEnFavoriInterrogeLEndpointDedie() {
+        reponses.put("/api/favoris/404", new Reponse(200, "true"));
 
         assertTrue(client().estEnFavori(404L));
-        assertEquals(List.of("/api/favoris?page=0&taille=100", "/api/favoris?page=1&taille=100"),
-                List.copyOf(chemins));
+        // Une seule requete sur /api/favoris/{id} : pas de parcours des pages.
+        assertEquals(List.of("/api/favoris/404"), List.copyOf(chemins));
     }
 
     @Test
-    void estEnFavoriRetourneFauxSansBoucleInfinie() {
-        reponses.put("/api/favoris#0", new Reponse(200, pageFavoris("1,2", 0, 1)));
+    void estEnFavoriRetourneFaux() {
+        reponses.put("/api/favoris/404", new Reponse(200, "false"));
 
         assertFalse(client().estEnFavori(404L));
-        // Une seule requete : pas de boucle sur la meme page.
-        assertEquals(1, chemins.size());
+        assertEquals(List.of("/api/favoris/404"), List.copyOf(chemins));
     }
 
     @Test
-    void estEnFavoriSurPageVideRetourneFaux() {
-        reponses.put("/api/favoris#0", new Reponse(200, pageFavoris("", 0, 0)));
+    void estEnFavoriSansJetonProduitSessionExpiree() {
+        reponses.put("/api/favoris/9", new Reponse(401, "{\"message\":\"Jeton invalide\"}"));
 
-        assertFalse(client().estEnFavori(1L));
-        assertEquals(1, chemins.size());
+        ErreurApi erreur = assertThrows(ErreurApi.class, () -> client().estEnFavori(9L));
+        assertEquals(401, erreur.statut());
+        assertTrue(erreur.estNonConnecte());
+    }
+
+    // ------------------------------------------------------------------
+    // Profil : rafraichissement via /api/auth/me (D8)
+    // ------------------------------------------------------------------
+
+    @Test
+    void moiInterrogeAuthMeEtExposeLesRolesAJour() {
+        reponses.put("/api/auth/me", new Reponse(200,
+                "{\"id\":7,\"email\":\"a@b.mg\",\"nom\":\"N\",\"prenom\":\"P\",\"role\":\"ADMIN\"}"));
+        session.connecter("jeton-secret", new ProfilResponse(7L, "a@b.mg", "N", "P", "LOCATAIRE"));
+
+        ProfilResponse profil = client().moi();
+
+        assertEquals("/api/auth/me", chemins.get(0));
+        assertEquals("ADMIN", profil.role());
+        assertEquals("Bearer jeton-secret", enTeteAutorization.get());
+        // La session n'est pas touchee par la lecture seule du profil.
+        assertFalse(session.estAdmin());
+        session.majProfil(profil);
+        assertTrue(session.estAdmin());
     }
 
     // ------------------------------------------------------------------
