@@ -311,8 +311,10 @@ public class AnnonceService {
 
     @Transactional(readOnly = true)
     public PageResponse<FavoriResponse> mesFavoris(Long utilisateurId, int page, int taille) {
-        Page<Favori> favoris = favoriRepository.findByUtilisateurIdAndAnnonce_StatutOrderByDateAjoutDesc(
-                utilisateurId, StatutAnnonce.ACTIVE,
+        // Les favoris restent consultables quand un bien passe a LOUEE,
+        // mais une annonce masquee par la moderation n'est pas exposee.
+        Page<Favori> favoris = favoriRepository.findByUtilisateurIdAndAnnonce_StatutInOrderByDateAjoutDesc(
+                utilisateurId, List.of(StatutAnnonce.ACTIVE, StatutAnnonce.LOUEE),
                 PageRequest.of(Math.max(page, 0), Math.min(Math.max(taille, 1), TAILLE_MAX_PAGE)));
 
         List<Favori> contenus = favoris.getContent();

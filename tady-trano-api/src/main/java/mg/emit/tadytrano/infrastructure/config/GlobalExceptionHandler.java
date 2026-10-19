@@ -18,8 +18,13 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import java.time.Instant;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ProblemDetail> gererApiException(ApiException ex) {
@@ -62,6 +67,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ProblemDetail> gererIntegriteDonnees(DataIntegrityViolationException ex) {
+        LOG.warn("Conflit d'integrite en base lors du traitement d'une requete API", ex);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(construire(HttpStatus.CONFLICT, "Operation impossible : les donnees entrent en conflit"));
     }

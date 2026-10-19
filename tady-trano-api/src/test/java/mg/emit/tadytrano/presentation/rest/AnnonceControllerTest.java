@@ -155,11 +155,12 @@ class AnnonceControllerTest extends AnnonceTestSupport {
         mockMvc.perform(get("/api/annonces"))
                 .andExpect(jsonPath("$.totalElements").value(0));
 
-        // Un favori devenu inactif est filtre et ne peut plus etre ajoute a nouveau.
+        // Le favori conserve l'annonce louee avec son statut; la nouvelle mise en favori est refusee.
         mockMvc.perform(get("/api/favoris")
                         .header("Authorization", "Bearer " + jetonLocataire))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(0));
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.contenu[0].annonce.statut").value("LOUEE"));
         mockMvc.perform(post("/api/favoris/" + annonceId)
                         .header("Authorization", "Bearer " + jetonLocataire))
                 .andExpect(status().isNotFound());
@@ -309,6 +310,18 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"statut\":\"ACTIVE\"}"))
                 .andExpect(status().isForbidden());
+
+        // L'admin retire le verrou de moderation; le proprietaire retrouve ses droits.
+        mockMvc.perform(patch("/api/admin/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonAdmin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"ACTIVE\"}"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"LOUEE\"}"))
+                .andExpect(status().isNoContent());
     }
 
     @Test

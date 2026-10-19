@@ -12,8 +12,8 @@ public interface FavoriRepository extends JpaRepository<Favori, Long> {
 
     Optional<Favori> findByUtilisateurIdAndAnnonceId(Long utilisateurId, Long annonceId);
 
-    Page<Favori> findByUtilisateurIdAndAnnonce_StatutOrderByDateAjoutDesc(
-            Long utilisateurId, StatutAnnonce statut, Pageable pageable);
+    Page<Favori> findByUtilisateurIdAndAnnonce_StatutInOrderByDateAjoutDesc(
+            Long utilisateurId, java.util.Collection<StatutAnnonce> statuts, Pageable pageable);
 
     void deleteByAnnonceId(Long annonceId);
 
