@@ -2,9 +2,12 @@ spring:
   application:
     name: tady-trano-api
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8}
+    # En production (hors profil local/test), DB_URL, DB_USER et DB_PASSWORD
+    # doivent etre defines par variables d'environnement. Aucun fallback
+    # securisant n'est fournit : l'application refuse de demarrer sinon.
+    url: ${DB_URL:jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8}
     username: ${DB_USER:root}
-    password: ${DB_PASSWORD:rootpass}
+    password: ${DB_PASSWORD:}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
@@ -23,11 +26,12 @@ server:
   # (surcharge par SERVER_PORT ou --server.port si besoin)
   port: ${SERVER_PORT:8081}
   error:
-    include-message: always
+    include-message: never
 
 jwt:
-  # Secret local par defaut (dev uniquement — pas de production)
-  secret: ${JWT_SECRET:eX09jEKwZJw105ujFfy9kTXqcce/VG3qSitjNOMbZdcQGhdTcvfl7Vi02J6SvD3LHNepXhrHDPuaTvP8O9pqsg==}
+  # Secret de signature des jetons JWT. Obligatoire en production :
+  # aucune valeur par defaut n'est fournie dans le depot.
+  secret: ${JWT_SECRET:}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 springdoc:

@@ -58,10 +58,10 @@ Le schéma est créé par Flyway (`V1__init.sql`), puis les données initiales s
 
 | Variable | Rôle | Défaut |
 |---|---|---|
-| `DB_PASSWORD` | Mot de passe de la base | aucun (obligatoire) |
+| `DB_PASSWORD` | Mot de passe de la base | **obligatoire, aucun fallback** |
 | `DB_USER` | Utilisateur de la base | `root` |
-| `DB_URL` | URL JDBC | `jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&...` |
-| `JWT_SECRET` | Secret de signature des jetons | valeur de développement |
+| `DB_URL` | URL JDBC | `jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=true&...` |
+| `JWT_SECRET` | Secret de signature des jetons | **obligatoire, aucun fallback** |
 | `JWT_EXPIRATION_MS` | Durée de vie des jetons | `86400000` (24 h) |
 | `SERVER_PORT` | Port de l'API | `8081` |
 
@@ -168,8 +168,8 @@ tady-trano/
 
 Projet destiné à un usage local. Avant toute mise en production, il faudrait :
 
-- activer HTTPS (API et base de données) et définir un `JWT_SECRET` propre ;
-- retirer les comptes de démonstration de la migration V2 ;
-- limiter les tentatives de connexion ;
+- activer HTTPS (API et base de données) et définir un `JWT_SECRET` propre (aucune valeur par défaut n'est fournie dans le dépôt) ;
+- les comptes de démonstration de la migration V2 sont désactivés par la migration V4 (corrective) ;
+- la limitation des tentatives de connexion est active (blocage temporaire après 5 échecs) ;
 - remplacer l'ajout de photos par URL par un téléversement avec contrôle du type et de la taille ;
 - ajouter un pré-filtre géographique pour le tri par distance si le nombre d'annonces devient important.

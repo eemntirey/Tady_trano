@@ -74,29 +74,9 @@
     </build>
 
     <profiles>
-        <profile>
-            <!-- Le plugin javafx-maven-plugin ne met que les artefacts "javafx-*" sur
-                 le module path, et les options JVM sont inserees AVANT le module path
-                 construit par le plugin (le dernier gagne) : on passe donc
-                 upgrade-module-path, qui est additif et ne depend pas de l'ordre. -->
-            <id>jdk-jsobject-26plus</id>
-            <activation>
-                <jdk>[26,)</jdk>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.openjfx</groupId>
-                        <artifactId>javafx-maven-plugin</artifactId>
-                        <configuration>
-                            <options>
-                                <option>--upgrade-module-path</option>
-                                <option>${settings.localRepository}/org/openjfx/jdk-jsobject/${javafx.version}/jdk-jsobject-${javafx.version}-win.jar</option>
-                            </options>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
+        <!-- Le profil jdk-jsobject-26plus a ete supprime : depuis JavaFX 24, le module
+             jdk.jsobject est fourni par OpenJFX lui-meme et est deja declare comme
+             dependance directe ci-dessus. Aucun chemin artefact specifique a un OS
+             n'est donc necessaire. -->
     </profiles>
 </project>

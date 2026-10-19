@@ -75,26 +75,20 @@ class AnnonceRechercheCasLimitesTest extends AnnonceTestSupport {
     }
 
     @Test
-    void latitudeSansLongitudeRetombeSurLeTriParDate() throws Exception {
+    void latitudeSansLongitudeRepond400() throws Exception {
         deuxAnnoncesDatees();
 
-        // Position incomplete : pas de tri par distance, repli sur datePublication DESC
+        // Position incomplete : lat sans lng est refuse (BUG-04)
         mockMvc.perform(get("/api/annonces").param("lat", "-18.91"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2))
-                .andExpect(jsonPath("$.contenu[0].titre").value("Plus recente"))
-                .andExpect(jsonPath("$.contenu[1].titre").value("Plus ancienne"));
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void longitudeSansLatitudeRetombeSurLeTriParDate() throws Exception {
+    void longitudeSansLatitudeRepond400() throws Exception {
         deuxAnnoncesDatees();
 
         mockMvc.perform(get("/api/annonces").param("lng", "47.52"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2))
-                .andExpect(jsonPath("$.contenu[0].titre").value("Plus recente"))
-                .andExpect(jsonPath("$.contenu[1].titre").value("Plus ancienne"));
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -133,5 +127,103 @@ class AnnonceRechercheCasLimitesTest extends AnnonceTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.contenu[0].distanceKm").value(0.0));
+    }
+
+    // ---------- BUG-04 : validation des parametres lat / lng ----------
+
+    @Test
+    void latitudeHorsBornesRepond400() throws Exception {
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "91")
+                        .param("lng", "47.52"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void latitudeMoinsHuitanteDixRepond400() throws Exception {
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "-91")
+                        .param("lng", "47.52"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void longitudeHorsBornesRepond400() throws Exception {
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "-18.91")
+                        .param("lng", "181"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void longitudeMoinsHuitanteDixRepond400() throws Exception {
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "-18.91")
+                        .param("lng", "-181"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void latitudeNonFinieRepond400() throws Exception {
+        // Double.parseDouble("NaN") donne NaN, Spring le lie en tant que Double.
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "NaN")
+                        .param("lng", "47.52"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void longitudeNonFinieRepond400() throws Exception {
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "-18.91")
+                        .param("lng", "Infinity"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void coordonneesValidesDansBornesRepond200() throws Exception {
+        deuxAnnoncesDatees();
+
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "-18.91")
+                        .param("lng", "47.52"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void limiteSuperieureLatitudeAcceptee() throws Exception {
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "90")
+                        .param("lng", "0"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void limiteSuperieureLongitudeAcceptee() throws Exception {
+        mockMvc.perform(get("/api/annonces")
+                        .param("lat", "0")
+                        .param("lng", "180"))
+                .andExpect(status().isOk());
+    }
+
+    // ---------- TEST-01 / BUG-01 : contrat DTO avec coordonnees ----------
+
+    @Test
+    void resumeAnnonceContientLatitudeEtLongitude() throws Exception {
+        String jeton = proprietaireConnecte();
+        Long typeId = typeLocationId();
+        Long quartierId = jdbc.queryForObject("SELECT id FROM quartier LIMIT 1", Long.class);
+
+        mockMvc.perform(post("/api/annonces")
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(annonceJson(typeId, quartierId)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/annonces"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contenu[0].latitude").value(-18.91))
+                .andExpect(jsonPath("$.contenu[0].longitude").value(47.52));
     }
 }

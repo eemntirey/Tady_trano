@@ -10,6 +10,7 @@ import mg.emit.tadytrano.application.dto.AnnonceResumeResponse;
 import mg.emit.tadytrano.application.dto.PhotoRequest;
 import mg.emit.tadytrano.application.dto.PhotoResponse;
 import mg.emit.tadytrano.application.dto.StatutAnnonceRequest;
+import mg.emit.tadytrano.application.exception.ApiException;
 import mg.emit.tadytrano.application.service.AnnonceService;
 import mg.emit.tadytrano.infrastructure.security.UtilisateurCourant;
 import org.springframework.http.HttpStatus;
@@ -59,8 +60,39 @@ public class AnnonceController {
             @RequestParam(required = false) Double lng,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int taille) {
+        validerCoordonneesRecherche(lat, lng);
         return annonceService.rechercher(typeLocationId, quartierId, villeId, prixMin, prixMax,
                 nbPiecesMin, nbPiecesMax, lat, lng, page, taille);
+    }
+
+    /**
+     * Valide que les parametres de reference GPS sont fournis en paire, finis
+     * et dans les bornes geographiques. Retourne 400 sinon.
+     */
+    private void validerCoordonneesRecherche(Double lat, Double lng) {
+        boolean latFournie = lat != null;
+        boolean lngFournie = lng != null;
+
+        if (latFournie != lngFournie) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Les parametres 'lat' et 'lng' doivent etre fournis ensemble pour le tri par distance.");
+        }
+        if (!latFournie) {
+            return; // Aucun tri par distance demande : rien a valider.
+        }
+
+        if (!Double.isFinite(lat) || !Double.isFinite(lng)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Les coordonnees 'lat' et 'lng' doivent etre des nombres finis.");
+        }
+        if (lat < -90.0 || lat > 90.0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "La latitude 'lat' doit etre comprise entre -90 et 90 degres.");
+        }
+        if (lng < -180.0 || lng > 180.0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "La longitude 'lng' doit etre comprise entre -180 et 180 degres.");
+        }
     }
 
     @GetMapping("/{id}")
