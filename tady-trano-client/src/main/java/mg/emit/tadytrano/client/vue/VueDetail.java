@@ -55,7 +55,7 @@ public class VueDetail extends VBox {
         HBox vignettes = new HBox(8);
         for (PhotoResponse photo : annonce.photos()) {
             ImageView v = Affichage.vignette(photo.url(), 90, 60);
-            v.setOnMouseClicked(e -> principale.setImage(v.getImage()));
+            v.setOnMouseClicked(e -> Affichage.charger(principale, photo.url(), 640, 380));
             v.getStyleClass().add("thumb-clickable");
             vignettes.getChildren().add(v);
         }
@@ -106,12 +106,12 @@ public class VueDetail extends VBox {
     }
 
     private void majPrincipale(List<PhotoResponse> photos) {
+        Affichage.charger(principale, null, 640, 380);
         photos.stream()
                 .filter(PhotoResponse::principale)
                 .findFirst()
                 .or(() -> photos.stream().findFirst())
-                .ifPresent(p -> principale.setImage(
-                        Affichage.vignette(p.url(), 640, 380).getImage()));
+                .ifPresent(p -> Affichage.charger(principale, p.url(), 640, 380));
     }
 
     private void basculerFavori(AnnonceDetailResponse annonce) {
