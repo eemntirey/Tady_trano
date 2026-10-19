@@ -321,6 +321,9 @@ public class VueMesAnnonces extends VBox {
         // Garde : setOnAction peut se declencher lors d'une selection programmatique ;
         // on ne recharge que si l'utilisateur change vraiment de ville.
         final Long[] villeAffichee = { null };
+        // Indique si lat/lng ont ete remplies automatiquement par le quartier (true)
+        // ou saisies/modifiees manuellement par l'utilisateur (false).
+        final boolean[] coordonneesAuto = { true };
 
         villeCombo.setOnAction(e -> {
             VilleResponse selection = villeCombo.getValue();
@@ -334,11 +337,17 @@ public class VueMesAnnonces extends VBox {
 
         quartierCombo.setOnAction(e -> {
             QuartierResponse q = quartierCombo.getValue();
-            if (q != null && q.latitude() != null && q.longitude() != null && latF.getText().isBlank()) {
+            if (q != null && q.latitude() != null && q.longitude() != null && coordonneesAuto[0]) {
                 latF.setText(String.valueOf(q.latitude()));
                 lngF.setText(String.valueOf(q.longitude()));
+                coordonneesAuto[0] = true;
             }
         });
+
+        // Toute modification manuelle des coordonnees desactive la mise a jour automatique.
+        java.util.function.Consumer<String> marquerManuel = s -> coordonneesAuto[0] = false;
+        latF.textProperty().addListener((o, a, b) -> marquerManuel.accept(b));
+        lngF.textProperty().addListener((o, a, b) -> marquerManuel.accept(b));
 
         // Prefill si modification : on charge d'abord l'annonce, puis les referentiels
         // en preslectionnant type / ville / quartier de l'annonce existante.
@@ -351,6 +360,9 @@ public class VueMesAnnonces extends VBox {
                 if (d.nbPieces() != null) piecesF.getValueFactory().setValue(d.nbPieces());
                 if (d.latitude() != null) latF.setText(String.valueOf(d.latitude()));
                 if (d.longitude() != null) lngF.setText(String.valueOf(d.longitude()));
+                // Les coordonnees d'une annonce existante sont considerees comme
+                // saisies/manuelles : on ne les ecrase pas si le quartier change.
+                coordonneesAuto[0] = d.latitude() == null && d.longitude() == null;
                 quartierCible[0] = d.quartier() != null ? d.quartier().id() : null;
                 chargerReferentiels(typeCombo, villeCombo, quartierCombo,
                         d.typeLocation() != null ? d.typeLocation().id() : null,

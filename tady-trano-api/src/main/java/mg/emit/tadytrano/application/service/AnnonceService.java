@@ -37,6 +37,8 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -58,6 +60,9 @@ public class AnnonceService {
     private final TypeLocationRepository typeLocationRepository;
     private final ProprietaireService proprietaireService;
     private final ReferentielService referentielService;
+
+    // Verrous applicatifs par annonce pour serialiser les mutations concurrentes (A-05).
+    private final ConcurrentHashMap<Long, ReentrantLock> verrous = new ConcurrentHashMap<>();
 
     /**
      * Recherche publique : uniquement les annonces actives, filtres optionnels,
@@ -234,9 +239,13 @@ public class AnnonceService {
 
     @Transactional
     public PhotoResponse ajouterPhoto(String email, Long annonceId, PhotoRequest demande) {
-        Annonce annonce = annonceDeProprietaire(email, annonceId);
-        List<Photo> existantes = photoRepository.findByAnnonceIdOrderByOrdreAsc(annonceId);
-        if (existantes.size() >= MAX_PHOTOS_PAR_ANNONCE) {
+        // Verrou applicatif par annonce pour serialiser les mutations concurrentes (A-05).
+        ReentrantLock verrou = verrous.computeIfAbsent(annonceId, k -> new ReentrantLock());
+        verrou.lock();
+        try {
+            Annonce annonce = annonceDeProprietaire(email, annonceId);
+            List<Photo> existantes = photoRepository.findByAnnonceIdOrderByOrdreAsc(annonceId);
+            if (existantes.size() >= MAX_PHOTOS_PAR_ANNONCE) {
             throw new ApiException(HttpStatus.BAD_REQUEST,
                     "Nombre maximum de photos atteint (" + MAX_PHOTOS_PAR_ANNONCE + ")");
         }
@@ -257,6 +266,9 @@ public class AnnonceService {
         photo.setPrincipale(demande.principale() || existantes.isEmpty());
         photo.setOrdre(ordreSuivant);
         return PhotoResponse.depuis(photoRepository.save(photo));
+        } finally {
+            verrou.unlock();
+        }
     }
 
     @Transactional
@@ -441,6 +453,8 @@ public class AnnonceService {
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat)) * Math.cos(Math.toRadians(aLat))
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        // Protection numerique : a peut depasser legerement 1 a cause des arrondis flottants.
+        a = Math.max(0.0, Math.min(1.0, a));
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return Math.round(RAYON_TERRE_KM * c * 10.0) / 10.0;
     }

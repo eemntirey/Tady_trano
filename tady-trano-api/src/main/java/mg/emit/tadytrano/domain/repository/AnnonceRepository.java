@@ -80,6 +80,8 @@ public interface AnnonceRepository extends JpaRepository<Annonce, Long> {
 
     Optional<Annonce> findByIdAndProprietaireId(Long id, Long proprietaireId);
 
+
+
     // Pour l'administration (F10)
     @EntityGraph(attributePaths = {"typeLocation", "quartier", "quartier.ville"})
     Page<Annonce> findByStatutOrderByDatePublicationDesc(StatutAnnonce statut, Pageable pageable);

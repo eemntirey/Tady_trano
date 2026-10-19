@@ -51,7 +51,7 @@ public class VueRecherche extends VBox {
     private final TadyTranoApp app;
     private final ApiClient api;
 
-    private final ComboBox<String> localisation = new ComboBox<>();
+    private final ComboBox<Object> localisation = new ComboBox<>();
     private final ComboBox<TypeLocationResponse> type = new ComboBox<>();
     private final ComboBox<Integer> piecesMin = new ComboBox<>();
     private final ComboBox<Integer> piecesMax = new ComboBox<>();
@@ -109,7 +109,7 @@ public class VueRecherche extends VBox {
 
         localisation.setPromptText("Ville/Quartier");
         localisation.getStyleClass().add("filter-field");
-        localisation.setCellFactory(lv -> new ListCell<>() {
+        localisation.setCellFactory(lv -> new ListCell<Object>() {
             private final Label maison = icone("\uE80F", "\u2302");
             private final Label texte = new Label();
             private final HBox ligne = new HBox(8, maison, texte);
@@ -119,12 +119,12 @@ public class VueRecherche extends VBox {
             }
 
             @Override
-            protected void updateItem(String item, boolean empty) {
+            protected void updateItem(Object item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setGraphic(null);
                 } else {
-                    texte.setText(item);
+                    texte.setText(item.toString());
                     setGraphic(ligne);
                 }
             }
@@ -323,16 +323,17 @@ public class VueRecherche extends VBox {
     private void appliquerReferentiel(Referentiel referentiel) {
         villesParNom.clear();
         quartiersParNom.clear();
-        Set<String> noms = new LinkedHashSet<>();
+        List<Object> items = new ArrayList<>();
         for (VilleResponse ville : referentiel.villes()) {
-            villesParNom.putIfAbsent(cle(ville.nom()), ville);
-            noms.add(ville.nom());
+            villesParNom.putIfAbsent(cle(ville.toString()), ville);
+            items.add(ville);
         }
         for (QuartierResponse quartier : referentiel.quartiers()) {
-            quartiersParNom.putIfAbsent(cle(quartier.nom()), quartier);
-            noms.add(quartier.nom());
+            // Clé composée nom (ville.nom) pour distinguer les quartiers homonymes.
+            quartiersParNom.putIfAbsent(cle(quartier.toString()), quartier);
+            items.add(quartier);
         }
-        localisation.getItems().setAll(noms);
+        localisation.getItems().setAll(items);
 
         type.getItems().setAll(referentiel.types());
         type.getItems().add(0, null);
@@ -368,13 +369,13 @@ public class VueRecherche extends VBox {
             if (reste-- <= 0) {
                 break;
             }
-            ToggleButton pastille = new ToggleButton(q.nom());
+            ToggleButton pastille = new ToggleButton(q.toString());
             pastille.getStyleClass().add("chip");
             pastille.setOnAction(e -> {
                 if (pastille.isSelected()) {
-                    appliquerValeurFiltre(() -> localisation.setValue(q.nom()));
+                    appliquerValeurFiltre(() -> localisation.setValue(q));
                     deselecterSauf(pastillesQuartier, pastille);
-                } else if (q.nom().equals(localisation.getValue())) {
+                } else if (localisation.getValue() != null && localisation.getValue().equals(q)) {
                     appliquerValeurFiltre(() -> localisation.setValue(null));
                 }
                 actualiserCommandeDistance();
@@ -444,15 +445,13 @@ public class VueRecherche extends VBox {
     private Map<String, String> filtresCourants() {
         Map<String, String> filtres = new LinkedHashMap<>();
 
-        String lieu = localisation.getValue() == null ? "" : localisation.getValue().trim();
-        if (!lieu.isEmpty()) {
-            VilleResponse ville = villesParNom.get(cle(lieu));
-            QuartierResponse quartier = ville == null ? quartiersParNom.get(cle(lieu)) : null;
-            if (ville != null) {
-                filtres.put("villeId", String.valueOf(ville.id()));
-            } else if (quartier != null) {
-                filtres.put("quartierId", String.valueOf(quartier.id()));
-            }
+        Object valeur = localisation.getValue();
+        if (valeur instanceof QuartierResponse quartier) {
+            // On resout directement l'objet selectionne : pas d'ambiguite sur les
+            // quartiers homonymes (meme nom, villes differentes).
+            filtres.put("quartierId", String.valueOf(quartier.id()));
+        } else if (valeur instanceof VilleResponse ville) {
+            filtres.put("villeId", String.valueOf(ville.id()));
         }
         if (type.getValue() != null) {
             filtres.put("typeLocationId", String.valueOf(type.getValue().id()));
@@ -553,8 +552,8 @@ public class VueRecherche extends VBox {
     }
 
     private QuartierResponse quartierSelectionne() {
-        String lieu = localisation.getValue();
-        return lieu == null ? null : quartiersParNom.get(cle(lieu));
+        Object valeur = localisation.getValue();
+        return valeur instanceof QuartierResponse q ? q : null;
     }
 
     private static boolean coordonneesValides(QuartierResponse quartier) {
@@ -621,7 +620,9 @@ public class VueRecherche extends VBox {
             badges.getChildren().add(typeBadge);
         }
         if (annonce.distanceKm() != null) {
-            Label distance = new Label(Affichage.distance(annonce.distanceKm()) + " de vous");
+            QuartierResponse quartierRef = quartierSelectionne();
+            String reference = (quartierRef != null ? quartierRef.toString() : "le quartier de reference");
+            Label distance = new Label(Affichage.distance(annonce.distanceKm()) + " du quartier " + reference);
             distance.getStyleClass().add("badge-distance");
             badges.getChildren().add(distance);
         }
