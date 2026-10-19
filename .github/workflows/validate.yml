@@ -159,7 +159,9 @@ jobs:
               exit 1
             fi
 
-            if ! grep -F "Could not resolve placeholder '$missing'" "$log"; then
+            # An absent URL can be rejected by Hikari before the explicit startup guard runs.
+            # Missing credentials can surface as a DB access denial; JWT_SECRET is checked by the guard.
+            if ! grep -Eqi "Could not resolve placeholder '$missing'|must start with \\"jdbc\\"|Access denied for user|Variable d'environnement obligatoire absente ou vide : $missing|JWT_SECRET doit contenir au moins 32 octets" "$log"; then
               cat "$log"
               echo "Startup failed, but not because required variable $missing was absent."
               exit 1
