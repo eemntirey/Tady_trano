@@ -12,8 +12,29 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run Maven tests
+        run: mvn -B -ntp test
+
+  mysql-migration:
+    needs: tests
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -39,9 +60,6 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-
-      - name: Run Maven tests
-        run: mvn -B -ntp test
 
       - name: Start API against MySQL and verify Flyway V3
         env:
@@ -79,6 +97,6 @@ jobs:
             exit 1
           fi
 
-          # Hibernate ddl-auto=validate checks the schema after Flyway. The API will not
-          # start successfully if V3 did not add annonce.masquee_par_admin.
-          grep -E "Successfully applied 3 migrations|Schema.*is up to date|Successfully validated" /tmp/tady-trano-api.log
+          # A successful start with ddl-auto=validate proves that Flyway created
+          # the schema expected by the entity, including V3's masquee_par_admin.
+          grep -E "Successfully applied 3 migrations|marquage moderation admin" /tmp/tady-trano-api.log
