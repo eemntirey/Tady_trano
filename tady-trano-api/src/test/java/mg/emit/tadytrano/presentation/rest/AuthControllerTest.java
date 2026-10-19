@@ -110,6 +110,19 @@ class AuthControllerTest {
     }
 
     @Test
+    void connexionCompteDesactiveRepond401() throws Exception {
+        String email = emailUnique();
+        inscrireEtRecupererToken(email, "MotDePasse123", Role.LOCATAIRE);
+        jdbc.update("UPDATE utilisateur SET actif = FALSE WHERE email = ?", email);
+
+        LoginRequest demande = new LoginRequest(email, "MotDePasse123");
+        mockMvc.perform(post("/api/auth/connexion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(demande)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void connexionAvecMotDePasseIncorrectRepond401() throws Exception {
         String email = emailUnique();
         inscrireEtRecupererToken(email, "MotDePasse123", Role.LOCATAIRE);
