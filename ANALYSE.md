@@ -5,8 +5,8 @@
 État documentaire actualisé après la PR #1 (fusionnée dans `main`) et la préparation de la
 PR sécurité : configuration commune sans secrets/identifiants de secours, garde de démarrage qui refuse les
 variables absentes/vides et les secrets JWT de moins de 32 octets, migration V4 de désactivation
-des comptes de démonstration persistants, et vérification CI des démarrages incomplets. Les résultats définitifs de la CI de la PR sécurité
-restent à consulter avant fusion.
+des comptes de démonstration persistants, et vérification CI des démarrages incomplets. La CI de la PR sécurité a validé les 34 tests API et 8 tests client, le démarrage MySQL avec
+Flyway V1–V4, le refus des six comptes de démonstration et les démarrages sans variables requises.
 
 ## 1. Vue d'ensemble
 
@@ -91,7 +91,7 @@ dans une PR dédiée sans changement de comportement.
 | Tri par distance (Haversine complet) | **136 ms** | 2 000 ms |
 | Filtre tranche de prix | **53 ms** | 2 000 ms |
 
-**42 tests attendus après le correctif sécurité** : 34 API + 8 client. Le statut réel de la CI de cette branche est la référence avant fusion.
+**42 tests passés en CI** : 34 API + 8 client, sans échec. Le contrôle MySQL/Flyway V1–V4 et les vérifications de démarrage avec configuration incomplète sont également réussis.
 
 ## 6. Sécurité et risques résiduels
 
