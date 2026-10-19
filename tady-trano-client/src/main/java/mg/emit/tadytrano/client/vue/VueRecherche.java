@@ -40,8 +40,9 @@ public class VueRecherche extends VBox {
     private static final double PRIX_MIN = 0;
     private static final double PRIX_MAX = 10_000_000;
     private static final double PAS_PRIX = 10_000;
-    private static final double PRIX_BAS_DEFAUT = 100_000;
-    private static final double PRIX_HAUT_DEFAUT = 2_000_000;
+    // Aucun filtre de prix par défaut : ne pas masquer les petites annonces.
+    private static final double PRIX_BAS_DEFAUT = PRIX_MIN;
+    private static final double PRIX_HAUT_DEFAUT = PRIX_MAX;
     /** Nombre maximal de pastilles de quartiers proposees en raccourci. */
     private static final int PASTILLES_QUARTIER = 10;
 
@@ -50,6 +51,11 @@ public class VueRecherche extends VBox {
 
     private final ComboBox<String> localisation = new ComboBox<>();
     private final ComboBox<TypeLocationResponse> type = new ComboBox<>();
+    private final ComboBox<Integer> piecesMin = new ComboBox<>();
+    private final ComboBox<Integer> piecesMax = new ComboBox<>();
+    private final Button autourQuartier = new Button("Autour du quartier");
+    private final Label positionStatut = new Label("Choisissez un quartier pour trier par distance.");
+    private boolean triParDistance = false;
     private final CurseurPlage prix = new CurseurPlage(PRIX_MIN, PRIX_MAX, PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT, PAS_PRIX);
     private final Label prixBas = new Label();
     private final Label prixHaut = new Label();
@@ -139,6 +145,23 @@ public class VueRecherche extends VBox {
         HBox ligneFiltres = new HBox(12, champLocalisation, type, plage);
         ligneFiltres.setAlignment(Pos.CENTER_LEFT);
 
+        // Filtres fonctionnels de nombre de pièces et position de référence.
+        piecesMin.setPromptText("Pièces min.");
+        piecesMax.setPromptText("Pièces max.");
+        piecesMin.getItems().setAll(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        piecesMax.getItems().setAll(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        piecesMin.setPrefWidth(110);
+        piecesMax.setPrefWidth(110);
+        piecesMin.getStyleClass().add("filter-field");
+        piecesMax.getStyleClass().add("filter-field");
+        autourQuartier.setDisable(true);
+        autourQuartier.getStyleClass().add("btn-ghost");
+        positionStatut.getStyleClass().add("muted");
+        HBox ligneAvancee = new HBox(10, new Label("Nombre de pièces :"),
+                piecesMin, piecesMax, autourQuartier, positionStatut);
+        ligneAvancee.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(positionStatut, Priority.ALWAYS);
+
         // --- pastilles de filtres rapides + actions ---
         pastilles.getStyleClass().add("chips-row");
         Button lancer = new Button("Rechercher");
@@ -168,6 +191,8 @@ public class VueRecherche extends VBox {
             if (miseAJourFiltresEnCours) {
                 return;
             }
+            triParDistance = false;
+            actualiserCommandeDistance();
             page = 0;
             deselecterSauf(pastillesQuartier, null);
             rechercher();
@@ -178,6 +203,32 @@ public class VueRecherche extends VBox {
             }
             page = 0;
             deselecterSauf(pastillesType, null);
+            rechercher();
+        });
+
+        piecesMin.setOnAction(e -> {
+            harmoniserPieces();
+            page = 0;
+            rechercher();
+        });
+        piecesMax.setOnAction(e -> {
+            harmoniserPieces();
+            page = 0;
+            rechercher();
+        });
+        autourQuartier.setOnAction(e -> {
+            QuartierResponse quartier = quartierSelectionne();
+            if (quartier == null || !coordonneesValides(quartier)) {
+                triParDistance = false;
+                positionStatut.setText("Ce quartier n'a pas de coordonnées.");
+            } else {
+                triParDistance = !triParDistance;
+                positionStatut.setText(triParDistance
+                        ? "Résultats triés par distance de " + quartier.nom()
+                        : "Tri par date de publication.");
+            }
+            actualiserCommandeDistance();
+            page = 0;
             rechercher();
         });
 
@@ -207,7 +258,8 @@ public class VueRecherche extends VBox {
         pagination.setAlignment(Pos.CENTER);
         pagination.getStyleClass().add("pagination-bar");
 
-        getChildren().addAll(titre, new Separator(), filtres, new Separator(), conteneurListe, pagination);
+        getChildren().addAll(titre, new Separator(), filtres, ligneAvancee,
+                new Separator(), conteneurListe, pagination);
         VBox.setVgrow(conteneurListe, Priority.ALWAYS);
     }
 
@@ -341,6 +393,11 @@ public class VueRecherche extends VBox {
             type.setValue(null);
         });
         prix.reinitialiser(PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT);
+        piecesMin.setValue(null);
+        piecesMax.setValue(null);
+        triParDistance = false;
+        actualiserCommandeDistance();
+        positionStatut.setText("Choisissez un quartier pour trier par distance.");
         deselecterSauf(pastillesType, null);
         deselecterSauf(pastillesQuartier, null);
         page = 0;
@@ -373,6 +430,17 @@ public class VueRecherche extends VBox {
         if (prix.haut() < PRIX_MAX) {
             filtres.put("prixMax", String.valueOf(Math.round(prix.haut())));
         }
+        if (piecesMin.getValue() != null) {
+            filtres.put("nbPiecesMin", String.valueOf(piecesMin.getValue()));
+        }
+        if (piecesMax.getValue() != null) {
+            filtres.put("nbPiecesMax", String.valueOf(piecesMax.getValue()));
+        }
+        QuartierResponse quartierReference = quartierSelectionne();
+        if (triParDistance && quartierReference != null && coordonneesValides(quartierReference)) {
+            filtres.put("lat", String.valueOf(quartierReference.latitude()));
+            filtres.put("lng", String.valueOf(quartierReference.longitude()));
+        }
 
         Map<String, String> finaux = filtres;
         final int pageDemandee = page;
@@ -396,6 +464,44 @@ public class VueRecherche extends VBox {
                     }
                     app.gererErreur(erreur);
                 });
+    }
+
+    private void harmoniserPieces() {
+        Integer min = piecesMin.getValue();
+        Integer max = piecesMax.getValue();
+        if (min != null && max != null && min > max) {
+            // Garder une plage cohérente en ajustant l'autre borne.
+            if (piecesMin.isFocused()) {
+                piecesMax.setValue(min);
+            } else {
+                piecesMin.setValue(max);
+            }
+        }
+    }
+
+    private QuartierResponse quartierSelectionne() {
+        String lieu = localisation.getValue();
+        return lieu == null ? null : quartiersParNom.get(cle(lieu));
+    }
+
+    private static boolean coordonneesValides(QuartierResponse quartier) {
+        return quartier.latitude() != null && quartier.longitude() != null
+                && Double.isFinite(quartier.latitude()) && Double.isFinite(quartier.longitude())
+                && quartier.latitude() >= -90 && quartier.latitude() <= 90
+                && quartier.longitude() >= -180 && quartier.longitude() <= 180;
+    }
+
+    private void actualiserCommandeDistance() {
+        QuartierResponse quartier = quartierSelectionne();
+        boolean disponible = quartier != null && coordonneesValides(quartier);
+        autourQuartier.setDisable(!disponible);
+        autourQuartier.setText(triParDistance ? "Tri par distance : actif" : "Autour du quartier");
+        if (!disponible) {
+            triParDistance = false;
+            if (positionStatut != null) {
+                positionStatut.setText("Choisissez un quartier avec coordonnées.");
+            }
+        }
     }
 
     private static String cle(String texte) {
