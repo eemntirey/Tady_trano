@@ -3,9 +3,9 @@
 **Auteur : Jhonny (v1.0) · Mise à jour v1.2 · 19 octobre 2026**
 
 État documentaire actualisé après la PR #1 (fusionnée dans `main`) et la préparation de la
-PR sécurité : configuration commune sans secrets/identifiants de secours, migration V4 de
-désactivation des comptes de démonstration persistants, et vérification CI prévue pour les
-variables de démarrage obligatoires. Les résultats définitifs de la CI de la PR sécurité
+PR sécurité : configuration commune sans secrets/identifiants de secours, garde de démarrage qui refuse les
+variables absentes/vides et les secrets JWT de moins de 32 octets, migration V4 de désactivation
+des comptes de démonstration persistants, et vérification CI des démarrages incomplets. Les résultats définitifs de la CI de la PR sécurité
 restent à consulter avant fusion.
 
 ## 1. Vue d'ensemble
@@ -14,7 +14,7 @@ restent à consulter avant fusion.
 |---|---|
 | **API** | Module `tady-trano-api` : Spring Boot, JWT, JPA/Flyway, contrôleurs REST |
 | **Client** | Module `tady-trano-client` : JavaFX desktop, client HTTP/JSON, vues de recherche et de gestion |
-| **Tests** | **39 au total : 31 API** (20 annonces/recherche + 11 authentification) + 8 client (lecture JSON) |
+| **Tests** | **42 au total : 34 API** (20 annonces/recherche + 11 authentification + 3 configuration sécurité) + 8 client (lecture JSON) |
 
 - Les fonctionnalités F1 à F10 du cahier des charges sont toutes présentes.
 - Le client utilise le nouveau CSS : plus aucun `setStyle` résiduel (les 2 relevés en v1.0
@@ -91,15 +91,16 @@ dans une PR dédiée sans changement de comportement.
 | Tri par distance (Haversine complet) | **136 ms** | 2 000 ms |
 | Filtre tranche de prix | **53 ms** | 2 000 ms |
 
-**39 tests attendus après le correctif sécurité** : 31 API + 8 client. Le statut réel de la CI de cette branche est la référence avant fusion.
+**42 tests attendus après le correctif sécurité** : 34 API + 8 client. Le statut réel de la CI de cette branche est la référence avant fusion.
 
 ## 6. Sécurité et risques résiduels
 
 ### 6.1 Démarrage et secrets
 
 - La configuration commune (`application.yml`) n'a plus de défaut pour `DB_URL`, `DB_USER`,
-  `DB_PASSWORD` ni `JWT_SECRET` : hors des profils `local` et `test`, leur absence doit
-  empêcher le démarrage. Le profil `local` garde ses valeurs de développement avec H2 volatile.
+  `DB_PASSWORD` ni `JWT_SECRET`. `ConfigurationDemarrageSecurisee` refuse hors des profils
+  `local` et `test` les variables absentes/vides, une URL non JDBC et un secret JWT de moins de
+  32 octets UTF-8. Le profil `local` garde ses valeurs de développement avec H2 volatile.
 - Les détails d'erreur serveur sont masqués par défaut (`server.error.include-message: never`) ;
   `local` et `test` peuvent les afficher pour le diagnostic.
 - Les comptes de démonstration V2 sont désactivés par la nouvelle migration V4 sur les bases
