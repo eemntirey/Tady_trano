@@ -5,58 +5,71 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.Separator;
-import javafx.scene.control.Spinner;
-import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import mg.emit.tadytrano.client.TadyTranoApp;
 import mg.emit.tadytrano.client.api.ApiClient;
 import mg.emit.tadytrano.client.dto.AnnonceResumeResponse;
 import mg.emit.tadytrano.client.dto.QuartierResponse;
 import mg.emit.tadytrano.client.dto.TypeLocationResponse;
 import mg.emit.tadytrano.client.dto.VilleResponse;
+import mg.emit.tadytrano.client.ui.CurseurPlage;
 import mg.emit.tadytrano.client.util.Affichage;
 
-import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
-/** Recherche publique d'annonces avec filtres et pagination. */
+/** Recherche publique d'annonces : filtres Ville/Quartier, Type, prix et
+ *  pastilles de filtres rapides (CDC 8.3 / maquette Disign4e). */
 public class VueRecherche extends VBox {
 
     private static final int TAILLE = 12;
+    private static final double PRIX_MIN = 0;
+    private static final double PRIX_MAX = 10_000_000;
+    private static final double PAS_PRIX = 10_000;
+    private static final double PRIX_BAS_DEFAUT = 100_000;
+    private static final double PRIX_HAUT_DEFAUT = 2_000_000;
+    /** Nombre maximal de pastilles de quartiers proposees en raccourci. */
+    private static final int PASTILLES_QUARTIER = 10;
 
     private final TadyTranoApp app;
     private final ApiClient api;
 
-    private final ComboBox<VilleResponse> ville = new ComboBox<>();
-    private final ComboBox<QuartierResponse> quartier = new ComboBox<>();
+    private final ComboBox<String> localisation = new ComboBox<>();
     private final ComboBox<TypeLocationResponse> type = new ComboBox<>();
-    private final Spinner<Integer> prixMin = entier(0, 0, 10_000_000);
-    private final Spinner<Integer> prixMax = entier(0, 0, 10_000_000);
-    private final Spinner<Integer> piecesMin = entier(1, 1, 20);
-    private final Spinner<Integer> piecesMax = entier(1, 1, 20);
+    private final CurseurPlage prix = new CurseurPlage(PRIX_MIN, PRIX_MAX, PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT, PAS_PRIX);
+    private final Label prixBas = new Label();
+    private final Label prixHaut = new Label();
+    private final FlowPane pastilles = new FlowPane(8, 8);
+
+    private final Map<String, VilleResponse> villesParNom = new LinkedHashMap<>();
+    private final Map<String, QuartierResponse> quartiersParNom = new LinkedHashMap<>();
+    private final List<ToggleButton> pastillesType = new ArrayList<>();
+    private final List<ToggleButton> pastillesQuartier = new ArrayList<>();
 
     private final FlowPane liste = new FlowPane();
     private final Label pageLabel = new Label();
-    private final Button precedent = new Button("<");
-    private final Button suivant = new Button(">");
+    private final Button precedent = new Button("\u2039");
+    private final Button suivant = new Button("\u203A");
 
     private int page = 0;
     private int totalPages = 0;
     /** Numero de sequence des recherches : permet d'ignorer les reponses perimees
      *  (filtre ou page change depuis le lancement de la requete). */
     private int generation = 0;
-    /** Meme principe pour le chargement des quartiers d'une ville. */
-    private int generationQuartiers = 0;
 
     public VueRecherche(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -67,41 +80,65 @@ public class VueRecherche extends VBox {
     }
 
     private void construire() {
-        setSpacing(10);
+        setSpacing(12);
         setPadding(new Insets(15));
 
         Label titre = new Label("Rechercher un logement");
         titre.getStyleClass().add("page-title");
 
-        // --- filtres ---
-        GridPane filtres = new GridPane();
-        filtres.setHgap(10);
-        filtres.setVgap(8);
-        filtres.setPadding(new Insets(10));
+        // --- barre de filtres (maquette : champ, type, curseur de prix) ---
+        VBox filtres = new VBox(12);
+        filtres.setPadding(new Insets(14, 16, 14, 16));
         filtres.getStyleClass().add("filter-bar");
 
-        ville.setPromptText("Ville");
-        ville.setPrefWidth(160);
-        quartier.setPromptText("Quartier");
-        quartier.setPrefWidth(180);
+        localisation.setPromptText("Ville/Quartier");
+        localisation.getStyleClass().add("filter-field");
+        localisation.setCellFactory(lv -> new ListCell<>() {
+            private final Label maison = icone("\uE80F", "\u2302");
+            private final Label texte = new Label();
+            private final HBox ligne = new HBox(8, maison, texte);
+
+            {
+                ligne.setAlignment(Pos.CENTER_LEFT);
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                } else {
+                    texte.setText(item);
+                    setGraphic(ligne);
+                }
+            }
+        });
+        HBox.setHgrow(localisation, Priority.ALWAYS);
+
+        Label epingle = icone("\uE707", "\u25CE");
+        HBox champLocalisation = new HBox(6, epingle, localisation);
+        champLocalisation.getStyleClass().add("champ-icone");
+        champLocalisation.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(champLocalisation, Priority.ALWAYS);
+
         type.setPromptText("Type");
-        type.setPrefWidth(130);
+        type.setPrefWidth(160);
+        type.getStyleClass().add("filter-field");
 
-        filtres.add(new Label("Ville"), 0, 0);
-        filtres.add(ville, 1, 0);
-        filtres.add(new Label("Quartier"), 2, 0);
-        filtres.add(quartier, 3, 0);
-        filtres.add(new Label("Type"), 4, 0);
-        filtres.add(type, 5, 0);
+        prixBas.getStyleClass().add("range-value");
+        prixHaut.getStyleClass().add("range-value");
+        prix.setMaxWidth(Double.MAX_VALUE);
+        HBox etiquettes = new HBox(prixBas, new Region(), prixHaut);
+        HBox.setHgrow(etiquettes.getChildren().get(1), Priority.ALWAYS);
+        VBox plage = new VBox(6, prix, etiquettes);
+        HBox.setHgrow(plage, Priority.ALWAYS);
+        plage.setMinWidth(260);
 
-        filtres.add(new Label("Prix min (Ar)"), 0, 1);
-        filtres.add(prixMin, 1, 1);
-        filtres.add(new Label("Prix max (Ar)"), 2, 1);
-        filtres.add(prixMax, 3, 1);
-        filtres.add(new Label("Pieces"), 4, 1);
-        HBox pieces = new HBox(8, piecesMin, new Label("a"), piecesMax);
-        filtres.add(pieces, 5, 1);
+        HBox ligneFiltres = new HBox(12, champLocalisation, type, plage);
+        ligneFiltres.setAlignment(Pos.CENTER_LEFT);
 
+        // --- pastilles de filtres rapides + actions ---
+        pastilles.getStyleClass().add("chips-row");
         Button lancer = new Button("Rechercher");
         lancer.setDefaultButton(true);
         lancer.getStyleClass().add("btn-primary-custom");
@@ -110,31 +147,30 @@ public class VueRecherche extends VBox {
             rechercher();
         });
         Button reinitialiser = new Button("Reinitialiser");
-        reinitialiser.setOnAction(e -> {
-            ville.getSelectionModel().clearSelection();
-            type.getSelectionModel().clearSelection();
-            quartier.getItems().clear();
-            prixMin.getValueFactory().setValue(0);
-            prixMax.getValueFactory().setValue(0);
-            piecesMin.getValueFactory().setValue(1);
-            piecesMax.getValueFactory().setValue(1);
+        reinitialiser.getStyleClass().add("btn-ghost");
+        reinitialiser.setOnAction(e -> reinitialiser());
+        HBox actions = new HBox(10, reinitialiser, lancer);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+
+        HBox lignePastilles = new HBox(12, pastilles, actions);
+        HBox.setHgrow(pastilles, Priority.ALWAYS);
+        lignePastilles.setAlignment(Pos.CENTER_LEFT);
+
+        filtres.getChildren().addAll(ligneFiltres, lignePastilles);
+
+        prix.basProperty().addListener((o, a, b) -> majEtiquettesPrix());
+        prix.hautProperty().addListener((o, a, b) -> majEtiquettesPrix());
+        majEtiquettesPrix();
+
+        localisation.setOnAction(e -> {
             page = 0;
+            deselecterSauf(pastillesQuartier, null);
             rechercher();
         });
-        HBox boutons = new HBox(10, lancer, reinitialiser);
-        boutons.setAlignment(Pos.CENTER_RIGHT);
-        filtres.add(boutons, 6, 1);
-
-        ville.setOnAction(e -> chargerQuartiers());
-        prixMin.valueProperty().addListener((o, a, b) -> {
-            if (b != null && prixMax.getValue() < b) {
-                prixMax.getValueFactory().setValue(b);
-            }
-        });
-        piecesMin.valueProperty().addListener((o, a, b) -> {
-            if (b != null && piecesMax.getValue() < b) {
-                piecesMax.getValueFactory().setValue(b);
-            }
+        type.setOnAction(e -> {
+            page = 0;
+            deselecterSauf(pastillesType, null);
+            rechercher();
         });
 
         // --- resultats ---
@@ -156,65 +192,166 @@ public class VueRecherche extends VBox {
                 rechercher();
             }
         });
-        pageLabel.setAlignment(Pos.CENTER);
+        pageLabel.getStyleClass().add("pagination-label");
+        precedent.getStyleClass().add("pagination-btn");
+        suivant.getStyleClass().add("pagination-btn");
         HBox pagination = new HBox(15, precedent, pageLabel, suivant);
         pagination.setAlignment(Pos.CENTER);
+        pagination.getStyleClass().add("pagination-bar");
 
-        getChildren().addAll(titre, new Separator(), filtres, conteneurListe, pagination);
+        getChildren().addAll(titre, new Separator(), filtres, new Separator(), conteneurListe, pagination);
         VBox.setVgrow(conteneurListe, Priority.ALWAYS);
     }
 
-    private void chargerReferentiel() {
-        app.appeler(api::villes, villes -> {
-            ville.getItems().setAll(villes);
-            ville.getItems().add(0, null);
-            type.getItems().setAll(api.typesLocation());
-            type.getItems().add(0, null);
-        });
+    private void majEtiquettesPrix() {
+        prixBas.setText(arriary(prix.bas()));
+        prixHaut.setText(arriary(prix.haut()));
     }
 
-    private void chargerQuartiers() {
-        final int gen = ++generationQuartiers;
-        VilleResponse selection = ville.getValue();
-        quartier.getItems().clear();
-        if (selection == null) {
-            return;
-        }
-        app.appeler(() -> api.quartiers(selection.id()), quartiers -> {
-            if (gen != generationQuartiers) {
-                return; // ville changee depuis : reponse perimee
-            }
-            quartier.getItems().setAll(quartiers);
-            quartier.getItems().add(0, null);
-        });
+    private static String arriary(double valeur) {
+        return "Ar " + String.format("%,.0f", valeur).replace(',', ' ');
     }
+
+    /** Icone monochrome (Segoe MDL2 Assets sous Windows) avec repli texte. */
+    private static Label icone(String glyphe, String repli) {
+        boolean disponible = Font.getFamilies().contains("Segoe MDL2 Assets");
+        Label etiquette = new Label(disponible ? glyphe : repli);
+        etiquette.getStyleClass().add("champ-icone-glyphe");
+        if (disponible) {
+            etiquette.setStyle("-fx-font-family: 'Segoe MDL2 Assets'; -fx-font-size: 15px;");
+        }
+        return etiquette;
+    }
+
+    // ------------------------------------------------------------------
+    // Referentiel (villes, quartiers, types) : champ, listes et pastilles
+    // ------------------------------------------------------------------
+
+    private record Referentiel(List<VilleResponse> villes,
+                               List<TypeLocationResponse> types,
+                               List<QuartierResponse> quartiers) {
+    }
+
+    private void chargerReferentiel() {
+        app.appeler(() -> {
+            List<VilleResponse> villes = api.villes();
+            List<TypeLocationResponse> types = api.typesLocation();
+            List<QuartierResponse> quartiers = new ArrayList<>();
+            for (VilleResponse ville : villes) {
+                quartiers.addAll(api.quartiers(ville.id()));
+            }
+            return new Referentiel(villes, types, quartiers);
+        }, this::appliquerReferentiel, app::gererErreur);
+    }
+
+    private void appliquerReferentiel(Referentiel referentiel) {
+        villesParNom.clear();
+        quartiersParNom.clear();
+        Set<String> noms = new LinkedHashSet<>();
+        for (VilleResponse ville : referentiel.villes()) {
+            villesParNom.putIfAbsent(cle(ville.nom()), ville);
+            noms.add(ville.nom());
+        }
+        for (QuartierResponse quartier : referentiel.quartiers()) {
+            quartiersParNom.putIfAbsent(cle(quartier.nom()), quartier);
+            noms.add(quartier.nom());
+        }
+        localisation.getItems().setAll(noms);
+
+        type.getItems().setAll(referentiel.types());
+        type.getItems().add(0, null);
+
+        construirePastilles(referentiel.types(), referentiel.quartiers());
+    }
+
+    private void construirePastilles(List<TypeLocationResponse> types,
+                                     List<QuartierResponse> quartiers) {
+        pastilles.getChildren().clear();
+        pastillesType.clear();
+        pastillesQuartier.clear();
+
+        for (TypeLocationResponse t : types) {
+            ToggleButton pastille = new ToggleButton(t.libelle());
+            pastille.getStyleClass().add("chip");
+            pastille.setOnAction(e -> {
+                if (pastille.isSelected()) {
+                    type.setValue(t);
+                    deselecterSauf(pastillesType, pastille);
+                } else if (type.getValue() == t) {
+                    type.setValue(null);
+                }
+                page = 0;
+                rechercher();
+            });
+            pastillesType.add(pastille);
+            pastilles.getChildren().add(pastille);
+        }
+
+        int reste = PASTILLES_QUARTIER;
+        for (QuartierResponse q : quartiers) {
+            if (reste-- <= 0) {
+                break;
+            }
+            ToggleButton pastille = new ToggleButton(q.nom());
+            pastille.getStyleClass().add("chip");
+            pastille.setOnAction(e -> {
+                if (pastille.isSelected()) {
+                    localisation.setValue(q.nom());
+                    deselecterSauf(pastillesQuartier, pastille);
+                } else if (q.nom().equals(localisation.getValue())) {
+                    localisation.setValue(null);
+                }
+                page = 0;
+                rechercher();
+            });
+            pastillesQuartier.add(pastille);
+            pastilles.getChildren().add(pastille);
+        }
+    }
+
+    private static void deselecterSauf(List<ToggleButton> boutons, ToggleButton garde) {
+        for (ToggleButton bouton : boutons) {
+            if (bouton != garde) {
+                bouton.setSelected(false);
+            }
+        }
+    }
+
+    private void reinitialiser() {
+        localisation.setValue(null);
+        type.setValue(null);
+        prix.reinitialiser(PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT);
+        deselecterSauf(pastillesType, null);
+        deselecterSauf(pastillesQuartier, null);
+        page = 0;
+        rechercher();
+    }
+
+    // ------------------------------------------------------------------
+    // Recherche
+    // ------------------------------------------------------------------
 
     private void rechercher() {
         Map<String, String> filtres = new LinkedHashMap<>();
-        if (ville.getValue() != null) {
-            filtres.put("villeId", String.valueOf(ville.getValue().id()));
-        }
-        if (quartier.getValue() != null) {
-            filtres.put("quartierId", String.valueOf(quartier.getValue().id()));
+
+        String lieu = localisation.getValue() == null ? "" : localisation.getValue().trim();
+        if (!lieu.isEmpty()) {
+            VilleResponse ville = villesParNom.get(cle(lieu));
+            QuartierResponse quartier = ville == null ? quartiersParNom.get(cle(lieu)) : null;
+            if (ville != null) {
+                filtres.put("villeId", String.valueOf(ville.id()));
+            } else if (quartier != null) {
+                filtres.put("quartierId", String.valueOf(quartier.id()));
+            }
         }
         if (type.getValue() != null) {
             filtres.put("typeLocationId", String.valueOf(type.getValue().id()));
         }
-        Integer pMin = valeur(prixMin);
-        Integer pMax = valeur(prixMax);
-        Integer nbMin = valeur(piecesMin);
-        Integer nbMax = valeur(piecesMax);
-        if (pMin > 0) {
-            filtres.put("prixMin", String.valueOf(pMin));
+        if (prix.bas() > PRIX_MIN) {
+            filtres.put("prixMin", String.valueOf(Math.round(prix.bas())));
         }
-        if (pMax > 0) {
-            filtres.put("prixMax", String.valueOf(pMax));
-        }
-        if (nbMin > 1) {
-            filtres.put("nbPiecesMin", String.valueOf(nbMin));
-        }
-        if (nbMax > nbMin) {
-            filtres.put("nbPiecesMax", String.valueOf(nbMax));
+        if (prix.haut() < PRIX_MAX) {
+            filtres.put("prixMax", String.valueOf(Math.round(prix.haut())));
         }
 
         Map<String, String> finaux = filtres;
@@ -241,6 +378,10 @@ public class VueRecherche extends VBox {
                 });
     }
 
+    private static String cle(String texte) {
+        return texte == null ? "" : texte.trim().toLowerCase(Locale.ROOT);
+    }
+
     private void afficher(List<AnnonceResumeResponse> annonces) {
         liste.getChildren().clear();
         for (AnnonceResumeResponse annonce : annonces) {
@@ -248,22 +389,28 @@ public class VueRecherche extends VBox {
         }
     }
 
-    /** Carte annonce cliquable (vignette + titre + prix + quartier). */
+    /** Carte annonce cliquable (vignette pleine largeur + titre + prix + lieu). */
     private VBox carte(AnnonceResumeResponse annonce) {
-        VBox carte = new VBox(4);
-        carte.setPadding(new Insets(8));
-        carte.setPrefWidth(240);
+        VBox carte = new VBox();
+        carte.setPrefWidth(190);
+        carte.setMaxWidth(190);
         carte.getStyleClass().add("annonce-card");
 
-        carte.getChildren().add(Affichage.vignette(annonce.urlPhotoPrincipale(), 224, 130));
+        StackPane media = new StackPane(Affichage.vignette(annonce.urlPhotoPrincipale(), 190, 112));
+        media.getStyleClass().add("card-media");
+        media.setPrefSize(190, 112);
+        media.setMaxSize(190, 112);
+
+        VBox corps = new VBox(4);
+        corps.getStyleClass().add("card-body");
 
         Label titre = new Label(annonce.titre());
         titre.getStyleClass().add("card-title");
         titre.setWrapText(true);
         titre.setMaxHeight(36);
 
-        Label prix = new Label(Affichage.prix(annonce.prix()));
-        prix.getStyleClass().add("card-price");
+        Label prixLabel = new Label(Affichage.prix(annonce.prix()));
+        prixLabel.getStyleClass().add("card-price");
 
         String lieu = annonce.quartier() == null ? "" : annonce.quartier().toString();
         Label quartierLabel = new Label(lieu);
@@ -273,30 +420,25 @@ public class VueRecherche extends VBox {
                 + (annonce.surface() != null ? " - " + annonce.surface() + " m2" : ""));
         details.getStyleClass().add("card-specs");
 
-        carte.getChildren().addAll(titre, prix, quartierLabel, details);
+        corps.getChildren().addAll(titre, prixLabel, quartierLabel, details);
 
+        HBox badges = new HBox(6);
+        if (annonce.typeLocation() != null) {
+            Label typeBadge = new Label(annonce.typeLocation().libelle());
+            typeBadge.getStyleClass().add("badge-info");
+            badges.getChildren().add(typeBadge);
+        }
         if (annonce.distanceKm() != null) {
             Label distance = new Label(Affichage.distance(annonce.distanceKm()) + " de vous");
             distance.getStyleClass().add("badge-distance");
-            carte.getChildren().add(distance);
+            badges.getChildren().add(distance);
+        }
+        if (!badges.getChildren().isEmpty()) {
+            corps.getChildren().add(badges);
         }
 
+        carte.getChildren().addAll(media, corps);
         carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), this::rechercher));
         return carte;
-    }
-
-    /** Valeur d'un Spinner editable : getValue() peut etre null tant que l'edition
-     *  n'est pas validee, on retombe alors sur 0. */
-    private static int valeur(Spinner<Integer> spinner) {
-        Integer v = spinner.getValue();
-        return v != null ? v : 0;
-    }
-
-    private static Spinner<Integer> entier(int valeur, int min, int max) {
-        Spinner<Integer> spinner = new Spinner<>();
-        spinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(min, max, valeur));
-        spinner.setEditable(true);
-        spinner.setPrefWidth(100);
-        return spinner;
     }
 }

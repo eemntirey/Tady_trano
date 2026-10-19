@@ -65,11 +65,38 @@
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
+                <version>0.0.9</version>
                 <configuration>
                     <mainClass>mg.emit.tadytrano.client.TadyTranoApp</mainClass>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <!-- Le plugin javafx-maven-plugin ne met que les artefacts "javafx-*" sur
+                 le module path, et les options JVM sont inserees AVANT le module path
+                 construit par le plugin (le dernier gagne) : on passe donc
+                 upgrade-module-path, qui est additif et ne depend pas de l'ordre. -->
+            <id>jdk-jsobject-26plus</id>
+            <activation>
+                <jdk>[26,)</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.openjfx</groupId>
+                        <artifactId>javafx-maven-plugin</artifactId>
+                        <configuration>
+                            <options>
+                                <option>--upgrade-module-path</option>
+                                <option>${settings.localRepository}/org/openjfx/jdk-jsobject/${javafx.version}/jdk-jsobject-${javafx.version}-win.jar</option>
+                            </options>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

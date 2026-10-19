@@ -6,12 +6,12 @@
    ========================================================================== */  
  
 /* ---------- Base ---------- */  
-.root {  
-    -fx-font-family: "Segoe UI", "Inter", "Roboto", "Helvetica Neue", sans-serif;  
-    -fx-font-size: 13px;  
-    -fx-background-color: -color-bg-inset;  
-}  
- 
+.root {
+    -fx-font-family: "Segoe UI", "Inter", "Roboto", "Helvetica Neue", sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: -color-bg-default;
+}
+
 .scroll-pane,  
 .scroll-pane > .viewport,  
 .scroll-transparent,  
@@ -19,14 +19,7 @@
     -fx-background-color: transparent;  
     -fx-border-color: transparent;  
 }  
- 
-/* ---------- Base ---------- */  
-.root {  
-    -fx-font-family: "Segoe UI", "Inter", "Roboto", "Helvetica Neue", sans-serif;  
-    -fx-font-size: 13px;  
-    -fx-background-color: -color-bg-inset;  
-}  
- 
+  
 
 /* ---------- Textes utilitaires ---------- */  
 .page-title {  
@@ -148,15 +141,137 @@
     -fx-text-fill: -color-accent-fg;  
 }  
   
-/* ---------- Recherche : barre de filtres ---------- */  
+/* ---------- Recherche : barre de filtres (maquette Disign4e) ---------- */  
 .filter-bar {  
-    -fx-background-color: -color-bg-default;  
-    -fx-background-radius: 12;  
+    -fx-background-color: -color-bg-subtle;  
+    -fx-background-radius: 14;  
     -fx-border-color: -color-border-muted;  
-    -fx-border-radius: 12;  
+    -fx-border-radius: 14;  
     -fx-padding: 14 16;  
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.05), 8, 0, 0, 2);  
 }  
+  
+.filter-field {  
+    -fx-background-color: -color-bg-default;  
+    -fx-background-radius: 8;  
+    -fx-border-color: -color-border-default;  
+    -fx-border-width: 1;  
+    -fx-border-radius: 8;  
+    -fx-pref-height: 36;  
+}  
+  
+.champ-icone {  
+    -fx-background-color: -color-bg-default;  
+    -fx-background-radius: 8;  
+    -fx-border-color: -color-border-default;  
+    -fx-border-width: 1;  
+    -fx-border-radius: 8;  
+    -fx-padding: 0 10;  
+    -fx-pref-height: 36;  
+}  
+  
+.champ-icone-glyphe {  
+    -fx-font-size: 15px;  
+    -fx-text-fill: -color-fg-muted;  
+}  
+  
+.champ-icone > .combo-box {  
+    -fx-background-color: transparent;  
+    -fx-background-insets: 0;  
+    -fx-border-color: transparent;  
+    -fx-border-width: 0;  
+    -fx-padding: 0;  
+}  
+  
+.champ-icone > .combo-box > .list-cell {  
+    -fx-padding: 8 0;  
+}  
+  
+/* ---------- Curseur de prix a deux poignees ---------- */  
+.range-slider {  
+    -fx-cursor: hand;  
+}  
+  
+.range-track {  
+    -fx-background-color: -color-border-default;  
+    -fx-background-radius: 4;  
+}  
+  
+.range-fill {  
+    -fx-background-color: -color-accent-emphasis;  
+    -fx-background-radius: 4;  
+}  
+  
+.range-thumb {  
+    -fx-background-color: -color-bg-default;  
+    -fx-border-color: -color-border-default;  
+    -fx-border-width: 1;  
+    -fx-background-radius: 4;  
+    -fx-border-radius: 4;  
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 4, 0, 0, 1);  
+}  
+  
+.range-value {  
+    -fx-font-size: 12px;  
+    -fx-text-fill: -color-fg-muted;  
+}  
+  
+/* ---------- Pastilles de filtres rapides ---------- */  
+.chips-row {  
+    -fx-padding: 2 0;  
+}  
+  
+.chip,  
+.chip:selected {  
+    -fx-background-radius: 999;  
+    -fx-border-radius: 999;  
+    -fx-border-width: 1;  
+    -fx-padding: 5 14;  
+    -fx-font-size: 12px;  
+    -fx-cursor: hand;  
+}  
+  
+.chip {  
+    -fx-background-color: -color-bg-default;  
+    -fx-border-color: -color-border-default;  
+    -fx-text-fill: -color-fg-default;  
+}  
+  
+.chip:hover {  
+    -fx-border-color: -color-accent-muted;  
+}  
+  
+.chip:selected {  
+    -fx-background-color: -color-accent-subtle;  
+    -fx-border-color: -color-accent-muted;  
+    -fx-text-fill: -color-accent-fg;  
+    -fx-font-weight: 600;  
+}  
+  
+/* ---------- Pagination ---------- */  
+.pagination-bar {  
+    -fx-padding: 6 0 2 0;  
+}  
+  
+.pagination-btn {  
+    -fx-background-color: -color-bg-subtle;  
+    -fx-background-radius: 8;  
+    -fx-border-color: -color-border-muted;  
+    -fx-border-width: 1;  
+    -fx-border-radius: 8;  
+    -fx-min-width: 30;  
+    -fx-padding: 3 10;  
+    -fx-cursor: hand;  
+}  
+  
+.pagination-btn:disabled {  
+    -fx-opacity: 0.4;  
+}  
+  
+.pagination-label {  
+    -fx-font-size: 12px;  
+    -fx-text-fill: -color-fg-muted;  
+}  
+
   
 /* ---------- Carte d'annonce ---------- */  
 .annonce-card {  
@@ -164,11 +279,10 @@
     -fx-background-radius: 14;  
     -fx-border-color: -color-border-muted;  
     -fx-border-radius: 14;  
-    -fx-padding: 12;  
-    -fx-spacing: 6;  
+    -fx-padding: 0;  
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.07), 12, 0, 0, 3);  
     -fx-cursor: hand;  
-    -fx-transition: all 0.2s ease;  
+    -fx-border-width: 1;  
 }  
   
 .annonce-card:hover {  
@@ -176,9 +290,21 @@
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.16), 18, 0, 0, 6);  
 }  
   
-.card-image-view {  
-    -fx-background-radius: 12 12 0 0;  
+.card-media {  
+    -fx-background-color: -color-bg-subtle;  
+    -fx-background-radius: 13 13 0 0;  
+    -fx-alignment: center;  
+    -fx-border-color: transparent;  
 }  
+  
+.card-media > .image-view {  
+    -fx-background-radius: 13 13 0 0;  
+}  
+  
+.card-body {  
+    -fx-padding: 10 12 12 12;  
+}  
+
   
 .card-title {  
     -fx-font-size: 14px;  
@@ -222,6 +348,15 @@
   
 /* ---------- Badges ---------- */  
 .card-type-badge {  
+    -fx-background-radius: 6;  
+    -fx-padding: 3 8;  
+    -fx-font-size: 10px;  
+    -fx-font-weight: bold;  
+}  
+  
+.badge-info {  
+    -fx-background-color: -color-bg-subtle;  
+    -fx-text-fill: -color-fg-muted;  
     -fx-background-radius: 6;  
     -fx-padding: 3 8;  
     -fx-font-size: 10px;  
@@ -340,6 +475,22 @@
 .btn-success-custom { -fx-background-color: -color-success-emphasis; }  
 .btn-danger-custom  { -fx-background-color: -color-danger-emphasis; }  
 .btn-warning-custom { -fx-background-color: -color-warning-emphasis; }  
+  
+.btn-ghost {  
+    -fx-background-color: transparent;  
+    -fx-background-radius: 8;  
+    -fx-border-color: -color-border-default;  
+    -fx-border-width: 1;  
+    -fx-border-radius: 8;  
+    -fx-text-fill: -color-fg-muted;  
+    -fx-padding: 8 16;  
+    -fx-cursor: hand;  
+}  
+  
+.btn-ghost:hover {  
+    -fx-background-color: -color-bg-subtle;  
+    -fx-text-fill: -color-fg-default;  
+}  
   
 .btn-primary-custom:hover,  
 .btn-success-custom:hover,  
