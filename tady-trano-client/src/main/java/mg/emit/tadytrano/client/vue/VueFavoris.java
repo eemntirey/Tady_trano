@@ -157,8 +157,8 @@ public class VueFavoris extends VBox {
         prix.setFont(Font.font("System", FontWeight.BOLD, 15));
         prix.getStyleClass().add("card-price");
 
-        Label statut = new Label(louee ? "LOUÉE" : "ACTIVE");
-        statut.getStyleClass().add(louee ? "badge-statut-louee" : "badge-statut-active");
+        Label statut = new Label("LOUÉE");
+        statut.getStyleClass().add("badge-statut-louee");
 
         Button detailBtn = new Button("Voir détail");
         detailBtn.getStyleClass().add("btn-info-custom");
@@ -179,7 +179,11 @@ public class VueFavoris extends VBox {
         HBox actions = new HBox(8, detailBtn, retirerBtn);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        card.getChildren().addAll(image, titre, statut, locLabel, prix, actions);
+        if (louee) {
+            card.getChildren().addAll(image, titre, statut, locLabel, prix, actions);
+        } else {
+            card.getChildren().addAll(image, titre, locLabel, prix, actions);
+        }
         return card;
     }
 }
