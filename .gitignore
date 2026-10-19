@@ -19,3 +19,4 @@ root_info.sql
 set_root_pass.sql
 *.log
 hs_err_pid*.log
+cp-client.txt
