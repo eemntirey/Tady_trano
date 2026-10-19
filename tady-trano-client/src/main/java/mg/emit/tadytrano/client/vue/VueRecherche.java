@@ -40,8 +40,8 @@ public class VueRecherche extends VBox {
     private static final double PRIX_MIN = 0;
     private static final double PRIX_MAX = 10_000_000;
     private static final double PAS_PRIX = 10_000;
-    private static final double PRIX_BAS_DEFAUT = 100_000;
-    private static final double PRIX_HAUT_DEFAUT = 2_000_000;
+    private static final double PRIX_BAS_DEFAUT = 0;
+    private static final double PRIX_HAUT_DEFAUT = 10_000_000;
     /** Nombre maximal de pastilles de quartiers proposees en raccourci. */
     private static final int PASTILLES_QUARTIER = 10;
 
@@ -50,6 +50,8 @@ public class VueRecherche extends VBox {
 
     private final ComboBox<String> localisation = new ComboBox<>();
     private final ComboBox<TypeLocationResponse> type = new ComboBox<>();
+    private final ComboBox<Integer> nbPiecesMin = new ComboBox<>();
+    private final ComboBox<Integer> nbPiecesMax = new ComboBox<>();
     private final CurseurPlage prix = new CurseurPlage(PRIX_MIN, PRIX_MAX, PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT, PAS_PRIX);
     private final Label prixBas = new Label();
     private final Label prixHaut = new Label();
@@ -125,6 +127,39 @@ public class VueRecherche extends VBox {
         type.setPrefWidth(160);
         type.getStyleClass().add("filter-field");
 
+        nbPiecesMin.getStyleClass().add("filter-field");
+        nbPiecesMin.setPromptText("Pièces min");
+        nbPiecesMin.setPrefWidth(100);
+        nbPiecesMin.getItems().add(null);
+        nbPiecesMin.getItems().addAll(1, 2, 3, 4, 5, 6);
+        nbPiecesMin.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(Integer v) {
+                return v == null ? "" : String.valueOf(v);
+            }
+
+            @Override
+            public Integer fromString(String s) {
+                return (s == null || s.isBlank()) ? null : Integer.valueOf(s.trim());
+            }
+        });
+        nbPiecesMax.getStyleClass().add("filter-field");
+        nbPiecesMax.setPromptText("Pièces max");
+        nbPiecesMax.setPrefWidth(100);
+        nbPiecesMax.getItems().add(null);
+        nbPiecesMax.getItems().addAll(1, 2, 3, 4, 5, 6);
+        nbPiecesMax.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(Integer v) {
+                return v == null ? "" : String.valueOf(v);
+            }
+
+            @Override
+            public Integer fromString(String s) {
+                return (s == null || s.isBlank()) ? null : Integer.valueOf(s.trim());
+            }
+        });
+
         prixBas.getStyleClass().add("range-value");
         prixHaut.getStyleClass().add("range-value");
         prix.setMaxWidth(Double.MAX_VALUE);
@@ -134,7 +169,7 @@ public class VueRecherche extends VBox {
         HBox.setHgrow(plage, Priority.ALWAYS);
         plage.setMinWidth(260);
 
-        HBox ligneFiltres = new HBox(12, champLocalisation, type, plage);
+        HBox ligneFiltres = new HBox(12, champLocalisation, type, nbPiecesMin, nbPiecesMax, plage);
         ligneFiltres.setAlignment(Pos.CENTER_LEFT);
 
         // --- pastilles de filtres rapides + actions ---
@@ -170,6 +205,14 @@ public class VueRecherche extends VBox {
         type.setOnAction(e -> {
             page = 0;
             deselecterSauf(pastillesType, null);
+            rechercher();
+        });
+        nbPiecesMin.setOnAction(e -> {
+            page = 0;
+            rechercher();
+        });
+        nbPiecesMax.setOnAction(e -> {
+            page = 0;
             rechercher();
         });
 
@@ -320,6 +363,8 @@ public class VueRecherche extends VBox {
     private void reinitialiser() {
         localisation.setValue(null);
         type.setValue(null);
+        nbPiecesMin.setValue(null);
+        nbPiecesMax.setValue(null);
         prix.reinitialiser(PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT);
         deselecterSauf(pastillesType, null);
         deselecterSauf(pastillesQuartier, null);
@@ -342,7 +387,17 @@ public class VueRecherche extends VBox {
                 filtres.put("villeId", String.valueOf(ville.id()));
             } else if (quartier != null) {
                 filtres.put("quartierId", String.valueOf(quartier.id()));
+                if (quartier.latitude() != null && quartier.longitude() != null) {
+                    filtres.put("lat", String.valueOf(quartier.latitude()));
+                    filtres.put("lng", String.valueOf(quartier.longitude()));
+                }
             }
+        }
+        if (nbPiecesMin.getValue() != null) {
+            filtres.put("nbPiecesMin", String.valueOf(nbPiecesMin.getValue()));
+        }
+        if (nbPiecesMax.getValue() != null) {
+            filtres.put("nbPiecesMax", String.valueOf(nbPiecesMax.getValue()));
         }
         if (type.getValue() != null) {
             filtres.put("typeLocationId", String.valueOf(type.getValue().id()));

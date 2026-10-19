@@ -355,10 +355,12 @@ public class VueMesAnnonces extends VBox {
                 chargerReferentiels(typeCombo, villeCombo, quartierCombo,
                         d.typeLocation() != null ? d.typeLocation().id() : null,
                         d.quartier() != null && d.quartier().ville() != null
-                                ? d.quartier().ville().id() : null);
+                                ? d.quartier().ville().id() : null,
+                        villeAffichee, quartierCible);
             });
         } else {
-            chargerReferentiels(typeCombo, villeCombo, quartierCombo, null, null);
+            chargerReferentiels(typeCombo, villeCombo, quartierCombo, null, null,
+                    villeAffichee, quartierCible);
         }
 
         Label erreurSaisie = new Label();
@@ -489,11 +491,14 @@ public class VueMesAnnonces extends VBox {
         }
     }
 
-    /** Charge types + villes et preslectionne ceux de l'annonce (null = creation). */
+    /** Charge types + villes et preslectionne ceux de l'annonce (null = creation).
+     *  `villeAffichee` / `quartierCible` sont les memoriaux du formulaire ouvert :
+     *  ils evitent un double chargement de quartiers via setOnAction. */
     private void chargerReferentiels(ComboBox<TypeLocationResponse> typeCombo,
                                      ComboBox<VilleResponse> villeCombo,
                                      ComboBox<QuartierResponse> quartierCombo,
-                                     Long typeId, Long villeId) {
+                                     Long typeId, Long villeId,
+                                     Long[] villeAffichee, Long[] quartierCible) {
         app.appeler(api::typesLocation, types -> {
             typeCombo.getItems().setAll(types);
             if (typeId != null) {
@@ -508,8 +513,10 @@ public class VueMesAnnonces extends VBox {
                 // on force le chargement des quartiers avec le quartier cible.
                 villes.stream().filter(v -> villeId.equals(v.id())).findFirst()
                         .ifPresent(v -> {
-                            villeCombo.getSelectionModel().select(v);
+                            // Marquer AVANT select() : si onAction se declenche, le
+                            // garde de l'ecouteur l'ignore et il n'y a pas de doublon.
                             villeAffichee[0] = v.id();
+                            villeCombo.getSelectionModel().select(v);
                             chargerQuartiers(villeCombo, quartierCombo, quartierCible[0]);
                         });
             } else if (!villes.isEmpty()) {

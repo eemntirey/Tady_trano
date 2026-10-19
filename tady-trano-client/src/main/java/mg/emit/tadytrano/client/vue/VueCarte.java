@@ -29,6 +29,9 @@ public class VueCarte extends VBox {
     private final ApiClient api;
     private final CarteView carteView = new CarteView();
     private final Label infoLabel = new Label("Chargement de la carte...");
+    /** Evite le double appel API : onMapReady() peut etre notifie deux fois
+     *  (sondage JS + notification Java apres SUCCEEDED). */
+    private boolean chargementLance = false;
 
     public VueCarte(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -73,7 +76,13 @@ public class VueCarte extends VBox {
             app.ouvrirDetail(annonceId, () -> app.ouvrir(this));
         });
 
-        carteView.getBridge().setOnMapReady(this::chargerAnnonces);
+        carteView.getBridge().setOnMapReady(() -> {
+            if (chargementLance) {
+                return; // double notification (sondage JS + bridge Java) : on ignore la seconde
+            }
+            chargementLance = true;
+            chargerAnnonces();
+        });
     }
 
     private void chargerAnnonces() {
@@ -82,11 +91,13 @@ public class VueCarte extends VBox {
             List<AnnonceResumeResponse> liste = reponse.contenu();
             carteView.afficherAnnonces(liste);
             infoLabel.setText(liste.size() + " annonce(s) positionnée(s) sur la carte. Cliquez sur un repère pour voir les détails.");
+            chargementLance = false; // "Actualiser" reste possible
         },
         err -> {
             // Laisser un retour visible sur la carte plutot qu'un libelle fige.
             infoLabel.setText("Impossible de charger les annonces sur la carte : "
                     + (err.getMessage() == null ? "erreur inattendue" : err.getMessage()));
+            chargementLance = false;
         });
     }
 }
