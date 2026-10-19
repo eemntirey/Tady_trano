@@ -167,7 +167,12 @@
             var bounds = [];
 
             annonces.forEach(function(a) {
-                if (!a.latitude || !a.longitude) return;
+                // Les coordonnees zero sont valides (equateur / meridien de Greenwich).
+                if (a.latitude == null || a.longitude == null) return;
+                var lat = Number(a.latitude);
+                var lng = Number(a.longitude);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)
+                    || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
 
                 var typeClass = 'piece';
                 if (a.typeLocation && a.typeLocation.code === 'HOTEL') typeClass = 'hotel';
@@ -182,7 +187,7 @@
                     iconAnchor: [40, 12]
                 });
 
-                var marker = L.marker([a.latitude, a.longitude], { icon: customIcon });
+                var marker = L.marker([lat, lng], { icon: customIcon });
 
                 var photoUrl = imageUrlSecurisee(a.urlPhotoPrincipale);
                 var typeLibelle = a.typeLocation ? String(a.typeLocation.libelle || 'Location') : 'Location';
@@ -231,7 +236,7 @@
 
                 marker.bindPopup(popupContent);
                 markersLayer.addLayer(marker);
-                bounds.push([a.latitude, a.longitude]);
+                bounds.push([lat, lng]);
             });
 
             if (bounds.length > 0 && !userMarker) {
@@ -275,7 +280,9 @@
         }
 
         function flyTo(lat, lng, zoom) {
-            if (map && lat && lng) {
+            // Ne pas traiter 0 comme une coordonnee absente.
+            if (map && Number.isFinite(lat) && Number.isFinite(lng)
+                && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
                 map.flyTo([lat, lng], zoom || 15, { duration: 1.2 });
             }
         }

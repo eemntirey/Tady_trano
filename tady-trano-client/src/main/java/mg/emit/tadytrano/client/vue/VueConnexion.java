@@ -39,6 +39,7 @@ public class VueConnexion extends VBox {
     private final RadioButton roleProprio = new RadioButton("Propriétaire / Agence");
     private final Label erreur = new Label();
     private final Button valider = new Button("Valider");
+    private boolean authentificationEnCours = false;
 
     public VueConnexion(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -124,6 +125,9 @@ public class VueConnexion extends VBox {
     }
 
     private void envoyer() {
+        if (authentificationEnCours) {
+            return; // ignore les clics repetes tant que la requete n'est pas terminee
+        }
         erreur.setText("");
         String adresse = email.getText().trim();
         String secret = motDePasse.getText();
@@ -139,18 +143,42 @@ public class VueConnexion extends VBox {
             String roleChoisi = roleProprio.isSelected() ? "PROPRIETAIRE" : "LOCATAIRE";
             RegisterRequest demande = new RegisterRequest(adresse, secret,
                     nom.getText().trim(), prenom.getText().trim(), roleChoisi);
+            demarrerAuthentification();
             Travailleur.faire(() -> api.inscription(demande),
-                    reponse -> app.apresAuthentification(reponse),
+                    reponse -> {
+                        terminerAuthentification();
+                        app.apresAuthentification(reponse);
+                    },
                     this::afficherErreur);
         } else {
+            demarrerAuthentification();
             Travailleur.faire(() -> api.connexion(new LoginRequest(adresse, secret)),
-                    reponse -> app.apresAuthentification(reponse),
+                    reponse -> {
+                        terminerAuthentification();
+                        app.apresAuthentification(reponse);
+                    },
                     this::afficherErreur);
         }
     }
 
+    private void demarrerAuthentification() {
+        authentificationEnCours = true;
+        valider.setDisable(true);
+        connexion.setDisable(true);
+        inscription.setDisable(true);
+    }
+
+    private void terminerAuthentification() {
+        authentificationEnCours = false;
+        valider.setDisable(false);
+        connexion.setDisable(false);
+        inscription.setDisable(false);
+    }
+
     private void afficherErreur(Exception e) {
+        erreur.setText(e.getMessage() == null || e.getMessage().isBlank()
+                ? "Impossible de terminer l'authentification." : e.getMessage());
+        terminerAuthentification();
         Affichage.erreur(e);
-        erreur.setText(e.getMessage());
     }
 }

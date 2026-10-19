@@ -10,6 +10,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import mg.emit.tadytrano.client.api.ApiClient;
 import mg.emit.tadytrano.client.api.Session;
@@ -55,6 +56,13 @@ public class TadyTranoApp extends Application {
         racine.setCenter(new VueConnexion(this, api));
 
         Scene scene = new Scene(racine, 1100, 750);
+        // Le libelle de la navigation annonce F7 : enregistrer effectivement le raccourci.
+        scene.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.F7) {
+                ouvrir(new VueCarte(this, api));
+                e.consume();
+            }
+        });
         themeManager.initialiser(scene);
         fenetre.setTitle("Tady Trano");
         fenetre.setScene(scene);

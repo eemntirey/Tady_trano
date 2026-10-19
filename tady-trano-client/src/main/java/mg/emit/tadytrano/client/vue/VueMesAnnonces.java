@@ -355,10 +355,12 @@ public class VueMesAnnonces extends VBox {
                 chargerReferentiels(typeCombo, villeCombo, quartierCombo,
                         d.typeLocation() != null ? d.typeLocation().id() : null,
                         d.quartier() != null && d.quartier().ville() != null
-                                ? d.quartier().ville().id() : null);
+                                ? d.quartier().ville().id() : null,
+                        quartierCible, villeAffichee);
             });
         } else {
-            chargerReferentiels(typeCombo, villeCombo, quartierCombo, null, null);
+            chargerReferentiels(typeCombo, villeCombo, quartierCombo, null, null,
+                    quartierCible, villeAffichee);
         }
 
         Label erreurSaisie = new Label();
@@ -493,7 +495,8 @@ public class VueMesAnnonces extends VBox {
     private void chargerReferentiels(ComboBox<TypeLocationResponse> typeCombo,
                                      ComboBox<VilleResponse> villeCombo,
                                      ComboBox<QuartierResponse> quartierCombo,
-                                     Long typeId, Long villeId) {
+                                     Long typeId, Long villeId,
+                                     Long[] quartierCible, Long[] villeAffichee) {
         app.appeler(api::typesLocation, types -> {
             typeCombo.getItems().setAll(types);
             if (typeId != null) {
@@ -509,8 +512,12 @@ public class VueMesAnnonces extends VBox {
                 villes.stream().filter(v -> villeId.equals(v.id())).findFirst()
                         .ifPresent(v -> {
                             villeCombo.getSelectionModel().select(v);
-                            villeAffichee[0] = v.id();
-                            chargerQuartiers(villeCombo, quartierCombo, quartierCible[0]);
+                            // setOnAction peut avoir charge les quartiers pendant la selection.
+                            // Si ce n'est pas le cas, on les charge explicitement une seule fois.
+                            if (villeAffichee[0] == null || !villeAffichee[0].equals(v.id())) {
+                                villeAffichee[0] = v.id();
+                                chargerQuartiers(villeCombo, quartierCombo, quartierCible[0]);
+                            }
                         });
             } else if (!villes.isEmpty()) {
                 villeCombo.getSelectionModel().select(0);
