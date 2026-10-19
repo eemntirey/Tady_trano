@@ -40,12 +40,12 @@ jobs:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_ROOT_PASSWORD: TadyCiDbPass_2026_Strong_83
           MYSQL_DATABASE: tady_trano
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpass"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pTadyCiDbPass_2026_Strong_83"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=12
@@ -61,11 +61,11 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Start API against MySQL and verify Flyway V3
+      - name: Start API against MySQL and verify Flyway V4 and security data
         env:
-          DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
+          DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&sslMode=REQUIRED&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
           DB_USER: root
-          DB_PASSWORD: rootpass
+          DB_PASSWORD: TadyCiDbPass_2026_Strong_83
           JWT_SECRET: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key-123456
           SERVER_PORT: '8081'
         shell: bash
@@ -98,5 +98,30 @@ jobs:
           fi
 
           # A successful start with ddl-auto=validate proves that Flyway created
-          # the schema expected by the entity, including V3's masquee_par_admin.
-          grep -E "Successfully applied 3 migrations|marquage moderation admin" /tmp/tady-trano-api.log
+          # the schema expected by the entities and applied migrations V1-V4.
+          grep -E "Successfully applied 4 migrations|securisation donnees demo" /tmp/tady-trano-api.log
+
+          # Assert the V4 production-safety migration changed the seeded demo data.
+          demo_accounts_active=$(mysql --protocol=TCP -h 127.0.0.1 -uroot -p"$DB_PASSWORD" --batch --skip-column-names -e "
+            SELECT COUNT(*) FROM utilisateur
+            WHERE email IN (
+              'admin@tady.mg', 'rakoto.proprio@gmail.com', 'contact@immo-tana.mg',
+              'randria.fianar@gmail.com', 'jhonny.etudiant@emit.mg', 'famille.rasoa@yahoo.fr'
+            ) AND actif = TRUE;
+          " tady_trano)
+          if [ "$demo_accounts_active" != "0" ]; then
+            echo "Expected all six demo accounts to be inactive; found $demo_accounts_active active account(s)."
+            exit 1
+          fi
+
+          demo_ads_masked=$(mysql --protocol=TCP -h 127.0.0.1 -uroot -p"$DB_PASSWORD" --batch --skip-column-names -e "
+            SELECT COUNT(*) FROM annonce
+            WHERE titre = 'Offre suspecte prix derisoire pour test moderation'
+              AND statut = 'MASQUEE';
+          " tady_trano)
+          if [ "$demo_ads_masked" -lt 1 ]; then
+            echo "Expected the seeded moderation test ad to be hidden by V4."
+            exit 1
+          fi
+
+          echo "MySQL/Flyway V4 and demo-data security checks passed."
