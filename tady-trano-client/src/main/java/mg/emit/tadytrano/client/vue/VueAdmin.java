@@ -34,6 +34,8 @@ public class VueAdmin extends VBox {
 
     private int page = 0;
     private int totalPages = 0;
+    /** Numero de sequence : ignore les reponses perimee d'une requete anterieure. */
+    private int generation = 0;
 
     public VueAdmin(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -95,8 +97,22 @@ public class VueAdmin extends VBox {
     private void charger() {
         String statutSelectionne = filtreStatut.getValue();
         String param = ("TOUS".equals(statutSelectionne)) ? null : statutSelectionne;
+        final int pageDemandee = page;
+        final int gen = ++generation;
 
-        app.appeler(() -> api.toutesLesAnnonces(param, page, TAILLE_PAGE), this::afficherResultats);
+        app.appeler(() -> api.toutesLesAnnonces(param, pageDemandee, TAILLE_PAGE),
+                reponse -> {
+                    if (gen != generation) {
+                        return; // reponse perimee
+                    }
+                    afficherResultats(reponse);
+                },
+                erreur -> {
+                    if (gen != generation) {
+                        return;
+                    }
+                    app.gererErreur(erreur);
+                });
     }
 
     private void afficherResultats(PageResponse<AnnonceResumeResponse> reponse) {

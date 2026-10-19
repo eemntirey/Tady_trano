@@ -38,6 +38,8 @@ public class VueFavoris extends VBox {
 
     private int page = 0;
     private int totalPages = 0;
+    /** Numero de sequence : ignore les reponses perimee d'une requete anterieure. */
+    private int generation = 0;
 
     public VueFavoris(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -90,7 +92,21 @@ public class VueFavoris extends VBox {
             return;
         }
 
-        app.appeler(() -> api.mesFavoris(page, TAILLE_PAGE), this::afficherResultats);
+        final int pageDemandee = page;
+        final int gen = ++generation;
+        app.appeler(() -> api.mesFavoris(pageDemandee, TAILLE_PAGE),
+                reponse -> {
+                    if (gen != generation) {
+                        return; // reponse perimee
+                    }
+                    afficherResultats(reponse);
+                },
+                erreur -> {
+                    if (gen != generation) {
+                        return;
+                    }
+                    app.gererErreur(erreur);
+                });
     }
 
     private void afficherResultats(PageResponse<FavoriResponse> reponse) {
