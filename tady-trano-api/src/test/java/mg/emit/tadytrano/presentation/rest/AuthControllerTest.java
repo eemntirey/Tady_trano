@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,6 +31,9 @@ class AuthControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private String emailUnique() {
         return "test-" + UUID.randomUUID() + "@tady.mg";
@@ -132,6 +136,16 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value(email))
                 .andExpect(jsonPath("$.role").value("PROPRIETAIRE"));
+    }
+
+    @Test
+    void jetonDeCompteDesactiveEstRefuse() throws Exception {
+        String email = emailUnique();
+        String jeton = inscrireEtRecupererToken(email, "MotDePasse123", Role.LOCATAIRE);
+        jdbc.update("UPDATE utilisateur SET actif = FALSE WHERE email = ?", email);
+
+        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + jeton))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

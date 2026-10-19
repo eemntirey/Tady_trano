@@ -138,6 +138,12 @@ class AnnonceControllerTest extends AnnonceTestSupport {
         mockMvc.perform(get("/api/annonces").param("quartierId", String.valueOf(quartierId)))
                 .andExpect(jsonPath("$.contenu[0].urlPhotoPrincipale").value("https://cdn.tady.mg/1.jpg"));
 
+        // Un locataire peut mettre en favori une annonce encore active.
+        String jetonLocataire = inscrire(emailUnique(), Role.LOCATAIRE);
+        mockMvc.perform(post("/api/favoris/" + annonceId)
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isCreated());
+
         // Changement de statut
         mockMvc.perform(patch("/api/annonces/" + annonceId + "/statut")
                         .header("Authorization", "Bearer " + jeton)
@@ -145,9 +151,18 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                         .content("{\"statut\":\"LOUEE\"}"))
                 .andExpect(status().isNoContent());
 
-        // Une annonce louee n'apparait plus dans la recherche publique
+        // Une annonce louee n'apparait plus dans la recherche publique.
         mockMvc.perform(get("/api/annonces"))
                 .andExpect(jsonPath("$.totalElements").value(0));
+
+        // Un favori devenu inactif est filtre et ne peut plus etre ajoute a nouveau.
+        mockMvc.perform(get("/api/favoris")
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mockMvc.perform(post("/api/favoris/" + annonceId)
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isNotFound());
 
         // Mais reste visible dans l'espace du proprietaire
         mockMvc.perform(get("/api/proprietaires/mes-annonces")
@@ -193,6 +208,47 @@ class AnnonceControllerTest extends AnnonceTestSupport {
         mockMvc.perform(get("/api/favoris")
                         .header("Authorization", "Bearer " + jetonLocataire))
                 .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void suppressionPhotoPrincipalePromouvoitLaSuivanteEtReordonne() throws Exception {
+        String jeton = proprietaireConnecte();
+        Long typeId = typeLocationId();
+        Long quartierId = jdbc.queryForObject("SELECT id FROM quartier LIMIT 1", Long.class);
+        mockMvc.perform(post("/api/annonces")
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(annonceJson(typeId, quartierId)))
+                .andExpect(status().isCreated());
+        Long annonceId = jdbc.queryForObject("SELECT id FROM annonce", Long.class);
+
+        String premiere = mockMvc.perform(post("/api/annonces/" + annonceId + "/photos")
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"https://cdn.tady.mg/a.jpg\",\"principale\":false}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.principale").value(true))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        Long premiereId = objectMapper.readTree(premiere).get("id").asLong();
+
+        String seconde = mockMvc.perform(post("/api/annonces/" + annonceId + "/photos")
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"https://cdn.tady.mg/b.jpg\",\"principale\":false}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.principale").value(false))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        Long secondeId = objectMapper.readTree(seconde).get("id").asLong();
+
+        mockMvc.perform(delete("/api/annonces/" + annonceId + "/photos/" + premiereId)
+                        .header("Authorization", "Bearer " + jeton))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/annonces/" + annonceId + "/photos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(secondeId))
+                .andExpect(jsonPath("$[0].principale").value(true))
+                .andExpect(jsonPath("$[0].ordre").value(1));
     }
 
     @Test
