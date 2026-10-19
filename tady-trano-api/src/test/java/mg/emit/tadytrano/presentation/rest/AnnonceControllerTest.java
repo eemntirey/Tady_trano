@@ -180,11 +180,11 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
 
-        // Mais reste visible dans l'espace du proprietaire
+        // L'annonce reste visible dans l'espace proprietaire, avec son statut de moderation.
         mockMvc.perform(get("/api/proprietaires/mes-annonces")
                         .header("Authorization", "Bearer " + jeton))
                 .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.contenu[0].statut").value("LOUEE"));
+                .andExpect(jsonPath("$.contenu[0].statut").value("MASQUEE"));
     }
 
     @Test
