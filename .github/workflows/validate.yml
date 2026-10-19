@@ -61,7 +61,7 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Start API against MySQL and verify Flyway V3
+      - name: Start API against MySQL and verify Flyway V4
         env:
           DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
           DB_USER: root
@@ -97,6 +97,77 @@ jobs:
             exit 1
           fi
 
-          # A successful start with ddl-auto=validate proves that Flyway created
-          # the schema expected by the entity, including V3's masquee_par_admin.
-          grep -E "Successfully applied 3 migrations|marquage moderation admin" /tmp/tady-trano-api.log
+          # A successful start with ddl-auto=validate proves Flyway created the
+          # expected schema, including V3 moderation and V4 demo-account lockdown.
+          grep -E "Successfully applied 4 migrations|desactivation comptes demo" /tmp/tady-trano-api.log
+
+          # Verify the known V2 demo credentials cannot authenticate on a persistent DB.
+          for email in \
+            admin@tady.mg \
+            rakoto.proprio@gmail.com \
+            contact@immo-tana.mg \
+            randria.fianar@gmail.com \
+            jhonny.etudiant@emit.mg \
+            famille.rasoa@yahoo.fr; do
+            http_code=$(curl --silent --show-error \
+              --output /tmp/tady-trano-demo-login.json \
+              --write-out '%{http_code}' \
+              --header 'Content-Type: application/json' \
+              --data "{\"email\":\"$email\",\"motDePasse\":\"Pass1234!\"}" \
+              http://127.0.0.1:8081/api/auth/connexion)
+            if [ "$http_code" != "401" ]; then
+              cat /tmp/tady-trano-demo-login.json
+              echo "Expected disabled demo account $email to return 401; got $http_code."
+              exit 1
+            fi
+          done
+
+      - name: Verify required production configuration fails closed
+        env:
+          DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
+          DB_USER: root
+          DB_PASSWORD: rootpass
+          JWT_SECRET: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key-123456
+          SERVER_PORT: '8082'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          check_missing() {
+            local missing="$1"
+            local log="/tmp/missing-${missing}.log"
+            local -a configured=(
+              "DB_URL=jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8"
+              "DB_USER=root"
+              "DB_PASSWORD=rootpass"
+              "JWT_SECRET=ci-only-secret-key-ci-only-secret-key-ci-only-secret-key-123456"
+            )
+            local -a supplied=()
+            local assignment
+            for assignment in "${configured[@]}"; do
+              if [[ "${assignment%%=*}" != "$missing" ]]; then
+                supplied+=("$assignment")
+              fi
+            done
+
+            echo "Checking required variable $missing..."
+            if timeout 90s env -u "$missing" "${supplied[@]}" \
+              mvn -B -ntp -pl tady-trano-api spring-boot:run \
+              -Dspring-boot.run.arguments=--server.port=8082 >"$log" 2>&1; then
+              cat "$log"
+              echo "Application unexpectedly started without $missing."
+              exit 1
+            fi
+
+            # An absent URL can be rejected by Hikari before the explicit startup guard runs.
+            # Missing credentials can surface as a DB access denial; JWT_SECRET is checked by the guard.
+            if ! grep -Eqi "Could not resolve placeholder '$missing'|must start with|Access denied for user|Variable d'environnement obligatoire absente ou vide : $missing|JWT_SECRET doit contenir au moins 32 octets" "$log"; then
+              cat "$log"
+              echo "Startup failed, but not because required variable $missing was absent."
+              exit 1
+            fi
+          }
+
+          for missing in DB_URL DB_USER DB_PASSWORD JWT_SECRET; do
+            check_missing "$missing"
+          done

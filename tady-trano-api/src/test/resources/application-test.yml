@@ -13,3 +13,7 @@ spring:
 jwt:
   secret: dGVzdC1zZWNyZXQtdGhhdC1pcy1hc3NlcnVlbWVudC1sb25nLWVub3VnaC10ZXN0LW9ubHktMDAxMjM0NTY3ODk=
   expiration-ms: 3600000
+
+server:
+  error:
+    include-message: always
