@@ -70,6 +70,8 @@ public class VueRecherche extends VBox {
     /** Numero de sequence des recherches : permet d'ignorer les reponses perimees
      *  (filtre ou page change depuis le lancement de la requete). */
     private int generation = 0;
+    /** Evite les actions reentrantes lorsque les pastilles pilotent les ComboBox. */
+    private boolean miseAJourFiltresEnCours = false;
 
     public VueRecherche(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -163,11 +165,17 @@ public class VueRecherche extends VBox {
         majEtiquettesPrix();
 
         localisation.setOnAction(e -> {
+            if (miseAJourFiltresEnCours) {
+                return;
+            }
             page = 0;
             deselecterSauf(pastillesQuartier, null);
             rechercher();
         });
         type.setOnAction(e -> {
+            if (miseAJourFiltresEnCours) {
+                return;
+            }
             page = 0;
             deselecterSauf(pastillesType, null);
             rechercher();
@@ -275,10 +283,10 @@ public class VueRecherche extends VBox {
             pastille.getStyleClass().add("chip");
             pastille.setOnAction(e -> {
                 if (pastille.isSelected()) {
-                    type.setValue(t);
+                    appliquerValeurFiltre(() -> type.setValue(t));
                     deselecterSauf(pastillesType, pastille);
                 } else if (type.getValue() == t) {
-                    type.setValue(null);
+                    appliquerValeurFiltre(() -> type.setValue(null));
                 }
                 page = 0;
                 rechercher();
@@ -296,16 +304,26 @@ public class VueRecherche extends VBox {
             pastille.getStyleClass().add("chip");
             pastille.setOnAction(e -> {
                 if (pastille.isSelected()) {
-                    localisation.setValue(q.nom());
+                    appliquerValeurFiltre(() -> localisation.setValue(q.nom()));
                     deselecterSauf(pastillesQuartier, pastille);
                 } else if (q.nom().equals(localisation.getValue())) {
-                    localisation.setValue(null);
+                    appliquerValeurFiltre(() -> localisation.setValue(null));
                 }
                 page = 0;
                 rechercher();
             });
             pastillesQuartier.add(pastille);
             pastilles.getChildren().add(pastille);
+        }
+    }
+
+    /** Modifie un filtre depuis une pastille sans déclencher le gestionnaire ComboBox en doublon. */
+    private void appliquerValeurFiltre(Runnable changement) {
+        miseAJourFiltresEnCours = true;
+        try {
+            changement.run();
+        } finally {
+            miseAJourFiltresEnCours = false;
         }
     }
 
@@ -318,8 +336,10 @@ public class VueRecherche extends VBox {
     }
 
     private void reinitialiser() {
-        localisation.setValue(null);
-        type.setValue(null);
+        appliquerValeurFiltre(() -> {
+            localisation.setValue(null);
+            type.setValue(null);
+        });
         prix.reinitialiser(PRIX_BAS_DEFAUT, PRIX_HAUT_DEFAUT);
         deselecterSauf(pastillesType, null);
         deselecterSauf(pastillesQuartier, null);
