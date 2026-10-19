@@ -83,8 +83,8 @@ public class CarteView extends StackPane {
                 && Double.isFinite(lat) && Double.isFinite(lng)
                 && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
             String lbl = ApiClient.serialiser(label == null ? "" : label)
-                    .replace("\u2028", "\\u2028")
-                    .replace("\u2029", "\\u2029");
+                    .replace(String.valueOf((char) 0x2028), "\\u2028")
+                    .replace(String.valueOf((char) 0x2029), "\\u2029");
             webEngine.executeScript("setUserLocation(" + lat + ", " + lng + ", " + lbl + ");");
         }
     }
