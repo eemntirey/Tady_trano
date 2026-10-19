@@ -1,6 +1,7 @@
 package mg.emit.tadytrano.domain.repository;
 
 import mg.emit.tadytrano.domain.model.Favori;
+import mg.emit.tadytrano.domain.model.StatutAnnonce;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,7 +12,8 @@ public interface FavoriRepository extends JpaRepository<Favori, Long> {
 
     Optional<Favori> findByUtilisateurIdAndAnnonceId(Long utilisateurId, Long annonceId);
 
-    Page<Favori> findByUtilisateurIdOrderByDateAjoutDesc(Long utilisateurId, Pageable pageable);
+    Page<Favori> findByUtilisateurIdAndAnnonce_StatutOrderByDateAjoutDesc(
+            Long utilisateurId, StatutAnnonce statut, Pageable pageable);
 
     void deleteByAnnonceId(Long annonceId);
 

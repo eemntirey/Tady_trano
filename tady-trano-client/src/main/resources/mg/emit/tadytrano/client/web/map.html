@@ -180,18 +180,50 @@
 
                 var marker = L.marker([a.latitude, a.longitude], { icon: customIcon });
 
-                var photoUrl = a.urlPhotoPrincipale || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400';
-                var typeLibelle = a.typeLocation ? a.typeLocation.libelle : 'Location';
-                var quartierNom = a.quartier ? a.quartier.nom : '';
+                var photoUrl = imageUrlSecurisee(a.urlPhotoPrincipale);
+                var typeLibelle = a.typeLocation ? String(a.typeLocation.libelle || 'Location') : 'Location';
+                var quartierNom = a.quartier ? String(a.quartier.nom || '') : '';
 
-                var popupContent = '<div class="popup-card">'
-                    + '<img class="popup-img" src="' + photoUrl + '" alt="' + a.titre + '" onerror="this.src=\'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400\';">'
-                    + '<div class="popup-body">'
-                    + '<div class="popup-type">' + typeLibelle + (quartierNom ? ' • ' + quartierNom : '') + '</div>'
-                    + '<div class="popup-title">' + (a.titre || '') + '</div>'
-                    + '<div class="popup-price">' + formatPrix(a.prix) + ' / mois</div>'
-                    + '<button class="popup-btn" onclick="onVoirDetail(' + a.id + ')">Voir l\'annonce</button>'
-                    + '</div></div>';
+                // Les champs de l'annonce sont rendus comme du texte, jamais comme du HTML.
+                var popupContent = document.createElement('div');
+                popupContent.className = 'popup-card';
+
+                var popupImg = document.createElement('img');
+                popupImg.className = 'popup-img';
+                popupImg.alt = String(a.titre || '');
+                popupImg.src = photoUrl;
+                popupImg.addEventListener('error', function() {
+                    popupImg.src = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400';
+                }, { once: true });
+                popupContent.appendChild(popupImg);
+
+                var popupBody = document.createElement('div');
+                popupBody.className = 'popup-body';
+
+                var popupType = document.createElement('div');
+                popupType.className = 'popup-type';
+                popupType.textContent = typeLibelle + (quartierNom ? ' • ' + quartierNom : '');
+                popupBody.appendChild(popupType);
+
+                var popupTitle = document.createElement('div');
+                popupTitle.className = 'popup-title';
+                popupTitle.textContent = String(a.titre || '');
+                popupBody.appendChild(popupTitle);
+
+                var popupPrice = document.createElement('div');
+                popupPrice.className = 'popup-price';
+                popupPrice.textContent = formatPrix(a.prix) + ' / mois';
+                popupBody.appendChild(popupPrice);
+
+                var popupButton = document.createElement('button');
+                popupButton.className = 'popup-btn';
+                popupButton.textContent = "Voir l'annonce";
+                popupButton.addEventListener('click', function() {
+                    var id = Number(a.id);
+                    if (Number.isSafeInteger(id) && id > 0) onVoirDetail(id);
+                });
+                popupBody.appendChild(popupButton);
+                popupContent.appendChild(popupBody);
 
                 marker.bindPopup(popupContent);
                 markersLayer.addLayer(marker);
@@ -203,21 +235,38 @@
             }
         }
 
+        function imageUrlSecurisee(value) {
+            var fallback = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400';
+            try {
+                var url = new URL(String(value || fallback));
+                if ((url.protocol !== 'https:' && url.protocol !== 'http:')
+                    || !url.hostname || url.username || url.password) {
+                    return fallback;
+                }
+                return url.href;
+            } catch (e) {
+                return fallback;
+            }
+        }
+
         function setUserLocation(lat, lng, label) {
             if (!map) return;
             if (userMarker) {
                 map.removeLayer(userMarker);
                 userMarker = null;
             }
-            if (lat && lng) {
+            if (Number.isFinite(lat) && Number.isFinite(lng)
+                && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
                 var userIcon = L.divIcon({
-                    html: '<div class="user-marker" title="' + (label || 'Position de référence') + '"></div>',
+                    html: '<div class="user-marker"></div>',
                     className: 'custom-user-icon',
                     iconSize: [22, 22],
                     iconAnchor: [11, 11]
                 });
                 userMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map);
-                userMarker.bindTooltip(label || "Votre position de référence", { permanent: false, direction: 'top' });
+                var tooltip = document.createElement('span');
+                tooltip.textContent = String(label || 'Votre position de référence');
+                userMarker.bindTooltip(tooltip, { permanent: false, direction: 'top' });
             }
         }
 

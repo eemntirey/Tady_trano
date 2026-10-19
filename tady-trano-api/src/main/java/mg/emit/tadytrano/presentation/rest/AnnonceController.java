@@ -69,7 +69,7 @@ public class AnnonceController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('PROPRIETAIRE', 'ADMIN')")
+    @PreAuthorize("hasRole('PROPRIETAIRE')")
     public ResponseEntity<AnnonceDetailResponse> creer(@AuthenticationPrincipal UserDetails principal,
                                                       @Valid @RequestBody AnnonceCreateRequest demande) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -77,7 +77,7 @@ public class AnnonceController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PROPRIETAIRE', 'ADMIN')")
+    @PreAuthorize("hasRole('PROPRIETAIRE')")
     public AnnonceDetailResponse modifier(@AuthenticationPrincipal UserDetails principal,
                                           @PathVariable Long id,
                                           @Valid @RequestBody AnnonceUpdateRequest demande) {
@@ -85,7 +85,7 @@ public class AnnonceController {
     }
 
     @PatchMapping("/{id}/statut")
-    @PreAuthorize("hasAnyRole('PROPRIETAIRE', 'ADMIN')")
+    @PreAuthorize("hasRole('PROPRIETAIRE')")
     public ResponseEntity<Void> changerStatut(@AuthenticationPrincipal UserDetails principal,
                                               @PathVariable Long id,
                                               @Valid @RequestBody StatutAnnonceRequest demande) {
@@ -94,7 +94,7 @@ public class AnnonceController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PROPRIETAIRE', 'ADMIN')")
+    @PreAuthorize("hasRole('PROPRIETAIRE')")
     public ResponseEntity<Void> supprimer(@AuthenticationPrincipal UserDetails principal,
                                           @PathVariable Long id) {
         annonceService.supprimer(utilisateurCourant.email(principal), id);
@@ -107,7 +107,7 @@ public class AnnonceController {
     }
 
     @PostMapping("/{id}/photos")
-    @PreAuthorize("hasAnyRole('PROPRIETAIRE', 'ADMIN')")
+    @PreAuthorize("hasRole('PROPRIETAIRE')")
     public ResponseEntity<PhotoResponse> ajouterPhoto(@AuthenticationPrincipal UserDetails principal,
                                                       @PathVariable Long id,
                                                       @Valid @RequestBody PhotoRequest demande) {
@@ -116,7 +116,7 @@ public class AnnonceController {
     }
 
     @DeleteMapping("/{id}/photos/{photoId}")
-    @PreAuthorize("hasAnyRole('PROPRIETAIRE', 'ADMIN')")
+    @PreAuthorize("hasRole('PROPRIETAIRE')")
     public ResponseEntity<Void> supprimerPhoto(@AuthenticationPrincipal UserDetails principal,
                                                @PathVariable Long id,
                                                @PathVariable Long photoId) {

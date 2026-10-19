@@ -255,19 +255,32 @@ public class ApiClient {
         return corpsReponse;
     }
 
-    private static String messageDerreur(String json, int statut) {
-        if (json.isBlank()) {
+    static String messageDerreur(String json, int statut) {
+        if (json == null || json.isBlank()) {
             return "Erreur " + statut;
         }
         try {
             var noeud = MAPPER.readTree(json);
-            var message = noeud.get("message");
-            if (message != null && !message.isNull()) {
-                return message.asText();
+            for (String cle : List.of("detail", "message", "title")) {
+                var valeur = noeud.get(cle);
+                if (valeur != null && !valeur.isNull() && !valeur.asText().isBlank()) {
+                    return valeur.asText();
+                }
             }
-            var errors = noeud.get("errors");
-            if (errors != null && errors.isArray() && errors.size() > 0) {
-                return errors.get(0).asText();
+            for (String cle : List.of("erreurs", "errors")) {
+                var erreurs = noeud.get(cle);
+                if (erreurs != null && erreurs.isArray() && !erreurs.isEmpty()) {
+                    var premiere = erreurs.get(0);
+                    if (!premiere.isNull()) {
+                        if (premiere.isTextual()) {
+                            return premiere.asText();
+                        }
+                        var detail = premiere.get("defaultMessage");
+                        if (detail == null) detail = premiere.get("message");
+                        if (detail != null && !detail.isNull()) return detail.asText();
+                        return premiere.toString();
+                    }
+                }
             }
         } catch (RuntimeException ignore) {
             // corps non JSON : on retombe sur le code HTTP

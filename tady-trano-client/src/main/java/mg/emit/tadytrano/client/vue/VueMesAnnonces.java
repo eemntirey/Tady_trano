@@ -1,5 +1,6 @@
 package mg.emit.tadytrano.client.vue;
 
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -309,25 +310,28 @@ public class VueMesAnnonces extends VBox {
             });
         }
 
+        Label erreurSaisie = new Label();
+        erreurSaisie.setWrapText(true);
+        erreurSaisie.setStyle("-fx-text-fill: #b91c1c;");
+        grid.add(erreurSaisie, 0, 10, 2, 1);
         dialog.getDialogPane().setContent(grid);
+
+        Button boutonEnregistrer = (Button) dialog.getDialogPane().lookupButton(enregistrerType);
+        boutonEnregistrer.addEventFilter(ActionEvent.ACTION, event -> {
+            try {
+                construireDemande(titreF, descF, typeCombo, quartierCombo,
+                        prixF, surfaceF, piecesF, latF, lngF);
+                erreurSaisie.setText("");
+            } catch (IllegalArgumentException ex) {
+                erreurSaisie.setText(ex.getMessage());
+                event.consume();
+            }
+        });
 
         dialog.setResultConverter(bouton -> {
             if (bouton == enregistrerType) {
-                try {
-                    Long typeId = typeCombo.getValue() != null ? typeCombo.getValue().id() : 1L;
-                    Long qId = quartierCombo.getValue() != null ? quartierCombo.getValue().id() : 1L;
-                    BigDecimal prix = new BigDecimal(prixF.getText().trim());
-                    Integer surface = surfaceF.getText().isBlank() ? null : Integer.parseInt(surfaceF.getText().trim());
-                    Integer pieces = piecesF.getValue();
-                    Double lat = latF.getText().isBlank() ? null : Double.parseDouble(latF.getText().trim());
-                    Double lng = lngF.getText().isBlank() ? null : Double.parseDouble(lngF.getText().trim());
-
-                    return new AnnonceRequest(typeId, qId, titreF.getText().trim(), descF.getText().trim(),
-                            prix, surface, pieces, lat, lng);
-                } catch (Exception ex) {
-                    Affichage.erreur(ex);
-                    return null;
-                }
+                return construireDemande(titreF, descF, typeCombo, quartierCombo,
+                        prixF, surfaceF, piecesF, latF, lngF);
             }
             return null;
         });
@@ -340,6 +344,86 @@ public class VueMesAnnonces extends VBox {
                 app.appeler(() -> api.modifierAnnonce(idModification, req), r -> charger());
             }
         });
+    }
+
+    private AnnonceRequest construireDemande(TextField titreF, TextArea descF,
+                                                ComboBox<TypeLocationResponse> typeCombo,
+                                                ComboBox<QuartierResponse> quartierCombo,
+                                                TextField prixF, TextField surfaceF,
+                                                Spinner<Integer> piecesF, TextField latF, TextField lngF) {
+        String titre = titreF.getText() == null ? "" : titreF.getText().trim();
+        if (titre.isBlank()) {
+            throw new IllegalArgumentException("Le titre de l'annonce est obligatoire.");
+        }
+        TypeLocationResponse type = typeCombo.getValue();
+        if (type == null) {
+            throw new IllegalArgumentException("Sélectionnez un type de location.");
+        }
+        QuartierResponse quartier = quartierCombo.getValue();
+        if (quartier == null) {
+            throw new IllegalArgumentException("Sélectionnez un quartier.");
+        }
+
+        String textePrix = normaliserNombre(prixF.getText());
+        if (textePrix.isBlank()) {
+            throw new IllegalArgumentException("Le prix mensuel est obligatoire.");
+        }
+        BigDecimal prix;
+        try {
+            prix = new BigDecimal(textePrix);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Prix invalide. Exemple : 80 000 ou 12,5.");
+        }
+        if (prix.signum() <= 0 || prix.scale() > 2 || prix.precision() - prix.scale() > 10) {
+            throw new IllegalArgumentException("Le prix doit etre positif et comporter au maximum 2 decimales.");
+        }
+
+        Integer surface = null;
+        if (surfaceF.getText() != null && !surfaceF.getText().isBlank()) {
+            try {
+                surface = Integer.parseInt(surfaceF.getText().trim());
+            } catch (NumberFormatException ex) {
+                throw new IllegalArgumentException("La surface doit etre un nombre entier.");
+            }
+            if (surface < 0) {
+                throw new IllegalArgumentException("La surface ne peut pas etre negative.");
+            }
+        }
+
+        Double lat = lireCoordonnee(latF.getText(), "latitude");
+        Double lng = lireCoordonnee(lngF.getText(), "longitude");
+        if ((lat == null) != (lng == null)) {
+            throw new IllegalArgumentException("Renseignez les deux coordonnees GPS, ou laissez-les toutes les deux vides.");
+        }
+        if (lat != null && (!Double.isFinite(lat) || lat < -90 || lat > 90
+                || !Double.isFinite(lng) || lng < -180 || lng > 180)) {
+            throw new IllegalArgumentException("Coordonnees GPS hors limites (latitude -90..90, longitude -180..180).");
+        }
+
+        Integer pieces = piecesF.getValue();
+        return new AnnonceRequest(type.id(), quartier.id(), titre,
+                descF.getText() == null ? null : descF.getText().trim(),
+                prix, surface, pieces, lat, lng);
+    }
+
+    private static String normaliserNombre(String texte) {
+        if (texte == null) {
+            return "";
+        }
+        return texte.trim().replace(" ", "").replace("\u00A0", "")
+                .replace("\u202F", "").replace(',', '.');
+    }
+
+    private static Double lireCoordonnee(String texte, String nom) {
+        String normalise = normaliserNombre(texte);
+        if (normalise.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(normalise);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("La " + nom + " doit etre un nombre valide.");
+        }
     }
 
     private void ouvrirGestionPhotos(Long annonceId) {

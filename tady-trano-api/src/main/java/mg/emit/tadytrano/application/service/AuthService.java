@@ -37,7 +37,7 @@ public class AuthService {
         if (demande.role() == Role.ADMIN) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Le role admin ne peut pas etre cree par inscription");
         }
-        if (utilisateurRepository.existsByEmail(demande.email())) {
+        if (utilisateurRepository.existsByEmailIgnoreCase(demande.email())) {
             throw new ApiException(HttpStatus.CONFLICT, "Un compte existe deja avec cet email");
         }
 
@@ -63,14 +63,14 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Authentification impossible");
         }
 
-        Utilisateur utilisateur = utilisateurRepository.findByEmail(demande.email())
+        Utilisateur utilisateur = utilisateurRepository.findByEmailIgnoreCase(demande.email())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Email ou mot de passe incorrect"));
 
         return construireReponse(utilisateur);
     }
 
     public ProfilResponse profil(String email) {
-        Utilisateur utilisateur = utilisateurRepository.findByEmail(email)
+        Utilisateur utilisateur = utilisateurRepository.findByEmailIgnoreCase(email == null ? null : email.trim())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Utilisateur introuvable"));
         return new ProfilResponse(
                 utilisateur.getId(),
