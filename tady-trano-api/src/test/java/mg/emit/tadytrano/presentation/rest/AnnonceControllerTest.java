@@ -165,6 +165,21 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                         .header("Authorization", "Bearer " + jetonLocataire))
                 .andExpect(status().isNotFound());
 
+        // Une annonce ensuite masquee par l'admin doit disparaître des favoris.
+        String emailAdmin = emailUnique();
+        inscrire(emailAdmin, Role.LOCATAIRE);
+        jdbc.update("UPDATE utilisateur SET role = 'ADMIN' WHERE email = ?", emailAdmin);
+        String jetonAdmin = connexion(emailAdmin);
+        mockMvc.perform(patch("/api/admin/annonces/" + annonceId + "/statut")
+                        .header("Authorization", "Bearer " + jetonAdmin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"statut\":\"MASQUEE\"}"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/favoris")
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+
         // Mais reste visible dans l'espace du proprietaire
         mockMvc.perform(get("/api/proprietaires/mes-annonces")
                         .header("Authorization", "Bearer " + jeton))

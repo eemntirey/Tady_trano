@@ -86,8 +86,8 @@ class AnnonceRechercheFluiditeTest extends AnnonceTestSupport {
         String sql = """
                 INSERT INTO annonce
                   (proprietaire_id, type_location_id, quartier_id, titre, description,
-                   prix, surface, nb_pieces, latitude, longitude, statut, date_publication)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE',
+                   prix, surface, nb_pieces, latitude, longitude, statut, masquee_par_admin, date_publication)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', FALSE,
                         TIMESTAMPADD(SECOND, ?, CURRENT_TIMESTAMP))""";
         jdbc.batchUpdate(sql, new BatchPreparedStatementSetter() {
             @Override
