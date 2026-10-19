@@ -56,7 +56,7 @@ public class VueFavoris extends VBox {
         conteneurCards.setHgap(15);
         conteneurCards.setVgap(15);
 
-        messageVide.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic; -fx-font-size: 14px;");
+        messageVide.getStyleClass().add("empty-message");
 
         // Pagination
         precedent.setOnAction(e -> {
@@ -118,10 +118,10 @@ public class VueFavoris extends VBox {
         VBox card = new VBox(8);
         card.setPadding(new Insets(12));
         card.setPrefWidth(260);
-        card.setStyle("-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);");
+        card.getStyleClass().add("list-row");
 
         ImageView image = Affichage.vignette(a.urlPhotoPrincipale(), 236, 140);
-        image.setStyle("-fx-cursor: hand;");
+        image.getStyleClass().add("thumb-clickable");
         image.setOnMouseClicked(e -> app.ouvrirDetail(a.id(), this::charger));
 
         Label titre = new Label(a.titre());
@@ -132,18 +132,18 @@ public class VueFavoris extends VBox {
         String localisation = (a.quartier() != null ? a.quartier().nom() + ", " : "")
                 + (a.quartier() != null && a.quartier().ville() != null ? a.quartier().ville().nom() : "");
         Label locLabel = new Label(localisation);
-        locLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px;");
+        locLabel.getStyleClass().add("card-location");
 
         Label prix = new Label(Affichage.prix(a.prix()));
         prix.setFont(Font.font("System", FontWeight.BOLD, 15));
-        prix.setStyle("-fx-text-fill: #27ae60;");
+        prix.getStyleClass().add("card-price");
 
         Button detailBtn = new Button("Voir détail");
-        detailBtn.setStyle("-fx-background-color: #2980b9; -fx-text-fill: white;");
+        detailBtn.getStyleClass().add("btn-info-custom");
         detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), this::charger));
 
         Button retirerBtn = new Button("Retirer");
-        retirerBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
+        retirerBtn.getStyleClass().add("btn-danger-custom");
         retirerBtn.setOnAction(e -> app.appeler(() -> {
             api.retirerFavori(a.id());
             return null;

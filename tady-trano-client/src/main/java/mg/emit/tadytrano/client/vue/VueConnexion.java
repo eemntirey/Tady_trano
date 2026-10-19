@@ -52,11 +52,12 @@ public class VueConnexion extends VBox {
         setPadding(new Insets(40));
         setAlignment(Pos.CENTER);
         setPrefWidth(420);
+        getStyleClass().add("auth-pane");
 
         Label titre = new Label("Tady Trano");
-        titre.setFont(Font.font("System", FontWeight.BOLD, 28));
+        titre.getStyleClass().add("auth-title");
         Label sousTitre = new Label("Trouvez votre maison à Madagascar");
-        sousTitre.setStyle("-fx-text-fill: #666;");
+        sousTitre.getStyleClass().add("muted");
 
         ToggleGroup groupe = new ToggleGroup();
         connexion.setToggleGroup(groupe);
@@ -88,7 +89,9 @@ public class VueConnexion extends VBox {
         grille.add(rolesBox, 1, 4);
         email.setPrefWidth(220);
 
-        erreur.setStyle("-fx-text-fill: #c0392b;");
+        erreur.getStyleClass().add("error-text");
+        erreur.setWrapText(true);
+        valider.getStyleClass().add("btn-primary-custom");
         valider.setMaxWidth(Double.MAX_VALUE);
         valider.setDefaultButton(true);
         valider.setOnAction(e -> envoyer());

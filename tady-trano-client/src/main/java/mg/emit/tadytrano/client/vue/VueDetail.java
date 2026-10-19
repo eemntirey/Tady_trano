@@ -56,24 +56,23 @@ public class VueDetail extends VBox {
         for (PhotoResponse photo : annonce.photos()) {
             ImageView v = Affichage.vignette(photo.url(), 90, 60);
             v.setOnMouseClicked(e -> principale.setImage(v.getImage()));
-            v.setStyle("-fx-cursor: hand;");
+            v.getStyleClass().add("thumb-clickable");
             vignettes.getChildren().add(v);
         }
 
         Label titre = new Label(annonce.titre());
-        titre.setFont(Font.font("System", FontWeight.BOLD, 24));
+        titre.getStyleClass().add("detail-title");
         titre.setWrapText(true);
 
         Label prix = new Label(Affichage.prix(annonce.prix()));
-        prix.setFont(Font.font("System", FontWeight.BOLD, 20));
-        prix.setStyle("-fx-text-fill: #1a5276;");
+        prix.getStyleClass().add("detail-price");
 
         Label caract = new Label(annonce.nbPieces() + " pieces"
                 + (annonce.surface() != null ? " - " + annonce.surface() + " m2" : "")
                 + " - " + annonce.typeLocation().libelle()
                 + " - " + annonce.quartier()
                 + "   [statut : " + annonce.statut() + "]");
-        caract.setStyle("-fx-text-fill: #555;");
+        caract.getStyleClass().add("muted");
 
         Label description = new Label(annonce.description() == null ? "" : annonce.description());
         description.setWrapText(true);
@@ -81,7 +80,7 @@ public class VueDetail extends VBox {
 
         VBox contact = new VBox(4);
         contact.setPadding(new Insets(10));
-        contact.setStyle("-fx-background-color: #eaf2f8; -fx-background-radius: 6;");
+        contact.getStyleClass().add(annonce.contact() != null ? "contact-card" : "contact-card-locked");
         if (annonce.contact() != null) {
             Label nom = new Label("Contact : " + annonce.contact().nom());
             nom.setFont(Font.font("System", FontWeight.BOLD, 14));

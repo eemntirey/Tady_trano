@@ -14,7 +14,12 @@ INSERT INTO quartier (id, nom, ville_id, latitude, longitude) VALUES
     (2, 'Ampasambazaha (Centre)', 1, -21.4528, 47.0863),
     (3, 'Ambalapaiso', 1, -21.4485, 47.0821),
     (4, 'Tanambao', 1, -21.4420, 47.0790),
-    (5, 'Isaha', 1, -21.4600, 47.0910);
+    (5, 'Isaha', 1, -21.4600, 47.0910),
+    (11, 'Soarano', 1, -21.4550, 47.0880),
+    (12, 'Ambatovinaky', 1, -21.4500, 47.0850),
+    (13, 'Mahazoarivo', 1, -21.4650, 47.0920),
+    (14, 'Ankidodo', 1, -21.4480, 47.0800),
+    (15, 'Tanana Ambany', 1, -21.4400, 47.0780);
 
 -- Antananarivo (centre: -18.8792, 47.5079)
 INSERT INTO quartier (id, nom, ville_id, latitude, longitude) VALUES
@@ -22,7 +27,12 @@ INSERT INTO quartier (id, nom, ville_id, latitude, longitude) VALUES
     (7, 'Analakely (Centre)', 2, -18.9056, 47.5255),
     (8, 'Ivandry (Résidentiel)', 2, -18.8752, 47.5230),
     (9, 'Itaosy', 2, -18.9320, 47.4720),
-    (10, 'Talatamaty (Aéroport)', 2, -18.8350, 47.4680);
+    (10, 'Talatamaty (Aéroport)', 2, -18.8350, 47.4680),
+    (16, 'Ambohijatovo', 2, -18.8900, 47.5100),
+    (17, 'Isotry', 2, -18.8850, 47.5050),
+    (18, 'Ambondrona', 2, -18.8700, 47.5200),
+    (19, 'Amparibe', 2, -18.9100, 47.5400),
+    (20, 'Antsakaviro', 2, -18.8950, 47.5000);
 
 -- 3. Utilisateurs de demonstration
 INSERT INTO utilisateur (id, email, mot_de_passe, nom, prenom, role, actif, date_inscription) VALUES

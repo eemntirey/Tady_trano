@@ -12,6 +12,7 @@ import javafx.stage.Stage;
 import mg.emit.tadytrano.client.api.ApiClient;
 import mg.emit.tadytrano.client.api.Session;
 import mg.emit.tadytrano.client.dto.AuthResponse;
+import mg.emit.tadytrano.client.ui.ThemeManager;
 import mg.emit.tadytrano.client.util.Affichage;
 import mg.emit.tadytrano.client.util.Travailleur;
 import mg.emit.tadytrano.client.vue.VueAdmin;
@@ -33,6 +34,8 @@ public class TadyTranoApp extends Application {
     private ApiClient api;
     private BorderPane racine;
     private Label utilisateur = new Label();
+    private final ThemeManager themeManager = new ThemeManager();
+    private final java.util.List<Button> boutonsNav = new java.util.ArrayList<>();
 
     public static void main(String[] args) {
         launch(args);
@@ -50,6 +53,7 @@ public class TadyTranoApp extends Application {
         racine.setCenter(new VueConnexion(this, api));
 
         Scene scene = new Scene(racine, 1100, 750);
+        themeManager.initialiser(scene);
         fenetre.setTitle("Tady Trano");
         fenetre.setScene(scene);
         fenetre.show();
@@ -87,12 +91,32 @@ public class TadyTranoApp extends Application {
         });
         deconnexion.visibleProperty().bind(session.connecteProperty());
 
-        utilisateur.setStyle("-fx-font-weight: bold; -fx-text-fill: white;");
+        for (Button b : java.util.List.of(recherche, carte, favoris, mesAnnonces, profil, admin)) {
+            b.getStyleClass().add("nav-button");
+            boutonsNav.add(b);
+        }
+        admin.managedProperty().bind(admin.visibleProperty());
+        deconnexion.getStyleClass().addAll("nav-button", "nav-button-danger");
+        deconnexion.managedProperty().bind(deconnexion.visibleProperty());
+
+        Button theme = new Button("Mode sombre");
+        theme.getStyleClass().add("nav-button");
+        theme.setOnAction(e -> {
+            themeManager.basculerTheme();
+            theme.setText(themeManager.estModeSombre() ? "Mode clair" : "Mode sombre");
+        });
+
+        Label marque = new Label("Tady Trano");
+        marque.getStyleClass().add("brand-title");
+
+        utilisateur.getStyleClass().add("user-pill");
+        utilisateur.visibleProperty().bind(utilisateur.textProperty().isNotEmpty());
+        utilisateur.managedProperty().bind(utilisateur.visibleProperty());
 
         Region poussiere = new Region();
         HBox.setHgrow(poussiere, Priority.ALWAYS);
-        HBox barre = new HBox(10, recherche, carte, favoris, mesAnnonces, profil, admin, poussiere, utilisateur, deconnexion);
-        barre.setStyle("-fx-padding: 10; -fx-background-color: #2c3e50;");
+        HBox barre = new HBox(10, marque, recherche, carte, favoris, mesAnnonces, profil, admin, poussiere, utilisateur, theme, deconnexion);
+        barre.getStyleClass().add("app-header");
         barre.setPrefHeight(48);
         return barre;
     }
@@ -106,6 +130,23 @@ public class TadyTranoApp extends Application {
     /** Affiche une vue dans la zone centrale. */
     public void ouvrir(javafx.scene.Parent vue) {
         racine.setCenter(vue);
+        majBoutonActif(vue);
+    }
+
+    private void majBoutonActif(javafx.scene.Parent vue) {
+        String cible = vue instanceof VueRecherche ? "Rechercher"
+                : vue instanceof VueCarte ? "Carte (F7)"
+                : vue instanceof VueFavoris ? "Favoris"
+                : vue instanceof VueMesAnnonces ? "Mes annonces"
+                : vue instanceof VueProfil ? "Profil"
+                : vue instanceof VueAdmin ? "Moderation"
+                : "";
+        for (Button b : boutonsNav) {
+            b.getStyleClass().remove("active");
+            if (b.getText().equals(cible)) {
+                b.getStyleClass().add("active");
+            }
+        }
     }
 
     /** Passe a la vue suivante apres connexion/inscription. */

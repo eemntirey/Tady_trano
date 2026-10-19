@@ -1,250 +1,375 @@
-/* ==========================================================================
-   TADY TRANO - STYLES GLOBAUX & THEMATIQUES (CDC 8.3)
-   Compatible avec AtlantaFX (Primer Light & Primer Dark)
-   ========================================================================== */
+/* ==========================================================================  
+   TADY TRANO - STYLES GLOBAUX (CDC 8.3 : interface moderne, themes clair/sombre)  
+   S'appuie sur les variables de couleur d'AtlantaFX (Primer Light / Primer Dark),  
+   donc chaque regle ci-dessous suit automatiquement le theme actif.  
+   Chargee par ThemeManager (feuille "auteur", prioritaire sur le theme).  
+   ========================================================================== */  
+ 
+/* ---------- Base ---------- */  
+.root {  
+    -fx-font-family: "Segoe UI", "Inter", "Roboto", "Helvetica Neue", sans-serif;  
+    -fx-font-size: 13px;  
+    -fx-background-color: -color-bg-inset;  
+}  
+ 
+.scroll-pane,  
+.scroll-pane > .viewport,  
+.scroll-transparent,  
+.scroll-transparent > .viewport {  
+    -fx-background-color: transparent;  
+    -fx-border-color: transparent;  
+}  
+ 
+/* ---------- Base ---------- */  
+.root {  
+    -fx-font-family: "Segoe UI", "Inter", "Roboto", "Helvetica Neue", sans-serif;  
+    -fx-font-size: 13px;  
+    -fx-background-color: -color-bg-inset;  
+}  
+ 
 
-.root {
-    -fx-font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    -fx-font-size: 13px;
-}
-
-/* Header & Navigation Bar */
-.app-header {
-    -fx-background-color: -color-bg-default;
-    -fx-border-color: -color-border-muted;
-    -fx-border-width: 0 0 1px 0;
-    -fx-padding: 10px 24px;
-}
-
-.brand-title {
-    -fx-font-size: 18px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -color-accent-emphasis;
-}
-
-.brand-subtitle {
-    -fx-font-size: 11px;
-    -fx-text-fill: -color-fg-muted;
-}
-
-.nav-button {
-    -fx-background-color: transparent;
-    -fx-text-fill: -color-fg-default;
-    -fx-font-size: 13px;
-    -fx-font-weight: 600;
-    -fx-padding: 8px 16px;
-    -fx-background-radius: 8px;
-    -fx-cursor: hand;
-}
-
-.nav-button:hover {
-    -fx-background-color: -color-bg-subtle;
-    -fx-text-fill: -color-accent-fg;
-}
-
-.nav-button.active {
-    -fx-background-color: -color-accent-subtle;
-    -fx-text-fill: -color-accent-emphasis;
-}
-
-/* User pill in header */
-.user-pill {
-    -fx-background-color: -color-bg-subtle;
-    -fx-border-color: -color-border-subtle;
-    -fx-border-radius: 20px;
-    -fx-background-radius: 20px;
-    -fx-padding: 4px 12px;
-}
-
-/* Sidebar / Filtres */
-.filter-pane {
-    -fx-background-color: -color-bg-subtle;
-    -fx-border-color: -color-border-muted;
-    -fx-border-width: 0 1px 0 0;
-    -fx-padding: 16px;
-}
-
-.filter-section-title {
-    -fx-font-size: 12px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -color-fg-muted;
-    -fx-padding: 8px 0 4px 0;
-}
-
-/* Annonce Card Component */
-.annonce-card {
-    -fx-background-color: -color-bg-default;
-    -fx-border-color: -color-border-muted;
-    -fx-border-radius: 12px;
-    -fx-background-radius: 12px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 10, 0, 0, 3);
-    -fx-cursor: hand;
-    -fx-transition: all 0.2s ease;
-}
-
-.annonce-card:hover {
-    -fx-border-color: -color-accent-muted;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.14), 16, 0, 0, 6);
-}
-
-.card-image-view {
-    -fx-background-radius: 12px 12px 0 0;
-}
-
-.card-type-badge {
-    -fx-background-radius: 6px;
-    -fx-padding: 3px 8px;
-    -fx-font-size: 10px;
-    -fx-font-weight: bold;
-}
-
-.badge-hotel {
-    -fx-background-color: #ede9fe;
-    -fx-text-fill: #6d28d9;
-}
-
-.badge-etage {
-    -fx-background-color: #e0f2fe;
-    -fx-text-fill: #0369a1;
-}
-
-.badge-piece {
-    -fx-background-color: #d1fae5;
-    -fx-text-fill: #047857;
-}
-
-.badge-louee {
-    -fx-background-color: #fee2e2;
-    -fx-text-fill: #b91c1c;
-}
-
-.badge-distance {
-    -fx-background-color: -color-bg-subtle;
-    -fx-text-fill: -color-accent-emphasis;
-    -fx-border-color: -color-accent-muted;
-    -fx-border-radius: 12px;
-    -fx-background-radius: 12px;
-    -fx-padding: 2px 8px;
-    -fx-font-size: 11px;
-    -fx-font-weight: 600;
-}
-
-.card-title {
-    -fx-font-size: 14px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -color-fg-default;
-}
-
-.card-price {
-    -fx-font-size: 16px;
-    -fx-font-weight: 800;
-    -fx-text-fill: -color-accent-emphasis;
-}
-
-.card-location {
-    -fx-font-size: 12px;
-    -fx-text-fill: -color-fg-muted;
-}
-
-.card-specs {
-    -fx-font-size: 11px;
-    -fx-text-fill: -color-fg-muted;
-}
-
-/* Favorite Star Button */
-.btn-fav {
-    -fx-background-color: rgba(255, 255, 255, 0.85);
-    -fx-background-radius: 50%;
-    -fx-min-width: 32px;
-    -fx-min-height: 32px;
-    -fx-max-width: 32px;
-    -fx-max-height: 32px;
-    -fx-padding: 0;
-    -fx-cursor: hand;
-    -fx-font-size: 14px;
-}
-
-.btn-fav:hover {
-    -fx-background-color: #ffffff;
-    -fx-scale-x: 1.15;
-    -fx-scale-y: 1.15;
-}
-
-/* Detail View */
-.detail-pane {
-    -fx-background-color: -color-bg-default;
-    -fx-padding: 24px;
-}
-
-.detail-title {
-    -fx-font-size: 22px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -color-fg-default;
-}
-
-.detail-price {
-    -fx-font-size: 24px;
-    -fx-font-weight: 800;
-    -fx-text-fill: -color-accent-emphasis;
-}
-
-.detail-box {
-    -fx-background-color: -color-bg-subtle;
-    -fx-border-color: -color-border-subtle;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
-    -fx-padding: 16px;
-}
-
-.contact-card {
-    -fx-background-color: -color-accent-subtle;
-    -fx-border-color: -color-accent-muted;
-    -fx-border-radius: 12px;
-    -fx-background-radius: 12px;
-    -fx-padding: 20px;
-}
-
-.contact-card-locked {
-    -fx-background-color: -color-bg-subtle;
-    -fx-border-color: -color-border-muted;
-    -fx-border-radius: 12px;
-    -fx-background-radius: 12px;
-    -fx-padding: 20px;
-}
-
-/* Dialogs */
-.auth-dialog {
-    -fx-background-color: -color-bg-default;
-    -fx-padding: 24px;
-}
-
-/* Action Buttons */
-.btn-primary-custom {
-    -fx-background-color: -color-accent-emphasis;
-    -fx-text-fill: -color-fg-on-emphasis;
-    -fx-font-weight: bold;
-    -fx-background-radius: 8px;
-    -fx-padding: 8px 18px;
-    -fx-cursor: hand;
-}
-
-.btn-primary-custom:hover {
-    -fx-opacity: 0.92;
-}
-
-/* Toast Notifications */
-.toast-success {
-    -fx-background-color: #059669;
-    -fx-text-fill: #ffffff;
-    -fx-background-radius: 8px;
-    -fx-padding: 10px 18px;
-    -fx-font-weight: 600;
-}
-
-.toast-error {
-    -fx-background-color: #dc2626;
-    -fx-text-fill: #ffffff;
-    -fx-background-radius: 8px;
-    -fx-padding: 10px 18px;
-    -fx-font-weight: 600;
-}
+/* ---------- Textes utilitaires ---------- */  
+.page-title {  
+    -fx-font-size: 22px;  
+    -fx-font-weight: bold;  
+    -fx-text-fill: -color-fg-default;  
+}  
+  
+.muted {  
+    -fx-text-fill: -color-fg-muted;  
+}  
+  
+.strong {  
+    -fx-font-weight: bold;  
+}  
+  
+.error-text {  
+    -fx-text-fill: -color-danger-fg;  
+    -fx-font-weight: 600;  
+}  
+  
+.success-text {  
+    -fx-text-fill: -color-success-fg;  
+    -fx-font-weight: 600;  
+}  
+  
+.empty-message {  
+    -fx-text-fill: -color-fg-muted;  
+    -fx-font-style: italic;  
+    -fx-font-size: 14px;  
+    -fx-padding: 24 0 0 0;  
+}  
+  
+.role-value {  
+    -fx-font-weight: bold;  
+    -fx-text-fill: -color-accent-fg;  
+}  
+  
+.thumb-clickable {  
+    -fx-cursor: hand;  
+}  
+  
+/* ---------- Barre de navigation ---------- */  
+.app-header {  
+    -fx-background-color: -color-bg-default;  
+    -fx-border-color: -color-border-muted;  
+    -fx-border-width: 0 0 1 0;  
+    -fx-padding: 10 20;  
+    -fx-spacing: 6;  
+    -fx-alignment: CENTER_LEFT;  
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.07), 10, 0, 0, 2);  
+}  
+  
+.brand-title {  
+    -fx-font-size: 19px;  
+    -fx-font-weight: 800;  
+    -fx-text-fill: -color-accent-fg;  
+    -fx-padding: 0 18 0 0;  
+}  
+  
+.nav-button,  
+.nav-button:focused {  
+    -fx-background-color: transparent;  
+    -fx-background-insets: 0;  
+    -fx-background-radius: 8;  
+    -fx-border-color: transparent;  
+    -fx-text-fill: -color-fg-default;  
+    -fx-font-size: 13px;  
+    -fx-font-weight: 600;  
+    -fx-padding: 8 14;  
+    -fx-cursor: hand;  
+}  
+  
+.nav-button.active,  
+.nav-button.active:focused {  
+    -fx-background-color: -color-accent-subtle;  
+    -fx-text-fill: -color-accent-fg;  
+}  
+  
+.nav-button:pressed {  
+    -fx-background-color: -color-neutral-muted;  
+}  
+  
+.nav-button-danger {  
+    -fx-text-fill: -color-danger-fg;  
+}  
+  
+.nav-button-danger:hover {  
+    -fx-background-color: -color-danger-subtle;  
+    -fx-text-fill: -color-danger-fg;  
+}  
+  
+.user-pill {  
+    -fx-background-color: -color-bg-subtle;  
+    -fx-border-color: -color-border-subtle;  
+    -fx-border-radius: 999;  
+    -fx-background-radius: 999;  
+    -fx-padding: 5 14;  
+    -fx-font-size: 12px;  
+    -fx-font-weight: 600;  
+    -fx-text-fill: -color-fg-muted;  
+}  
+  
+/* ---------- Connexion / inscription : carte centree ---------- */  
+.auth-pane {  
+    -fx-background-color: -color-bg-default;  
+    -fx-background-radius: 16;  
+    -fx-border-color: -color-border-muted;  
+    -fx-border-radius: 16;  
+    -fx-padding: 36 40;  
+    -fx-max-width: 460;  
+    -fx-max-height: 560;  
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 28, 0, 0, 8);  
+}  
+  
+.auth-title {  
+    -fx-font-size: 30px;  
+    -fx-font-weight: 800;  
+    -fx-text-fill: -color-accent-fg;  
+}  
+  
+/* ---------- Recherche : barre de filtres ---------- */  
+.filter-bar {  
+    -fx-background-color: -color-bg-default;  
+    -fx-background-radius: 12;  
+    -fx-border-color: -color-border-muted;  
+    -fx-border-radius: 12;  
+    -fx-padding: 14 16;  
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.05), 8, 0, 0, 2);  
+}  
+  
+/* ---------- Carte d'annonce ---------- */  
+.annonce-card {  
+    -fx-background-color: -color-bg-default;  
+    -fx-background-radius: 14;  
+    -fx-border-color: -color-border-muted;  
+    -fx-border-radius: 14;  
+    -fx-padding: 12;  
+    -fx-spacing: 6;  
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.07), 12, 0, 0, 3);  
+    -fx-cursor: hand;  
+    -fx-transition: all 0.2s ease;  
+}  
+  
+.annonce-card:hover {  
+    -fx-border-color: -color-accent-muted;  
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.16), 18, 0, 0, 6);  
+}  
+  
+.card-image-view {  
+    -fx-background-radius: 12 12 0 0;  
+}  
+  
+.card-title {  
+    -fx-font-size: 14px;  
+    -fx-font-weight: bold;  
+    -fx-text-fill: -color-fg-default;  
+}  
+  
+.card-price {  
+    -fx-font-size: 17px;  
+    -fx-font-weight: 800;  
+    -fx-text-fill: -color-accent-fg;  
+}  
+  
+.card-location {  
+    -fx-font-size: 12px;  
+    -fx-text-fill: -color-fg-muted;  
+}  
+  
+.card-specs {  
+    -fx-font-size: 11px;  
+    -fx-text-fill: -color-fg-muted;  
+}  
+  
+/* ---------- Lignes de liste (favoris, mes annonces, moderation) ---------- */  
+.list-row {  
+    -fx-background-color: -color-bg-default;  
+    -fx-background-radius: 12;  
+    -fx-border-color: -color-border-muted;  
+    -fx-border-radius: 12;  
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.05), 8, 0, 0, 2);  
+}  
+  
+.list-row:hover {  
+    -fx-border-color: -color-accent-muted;  
+}  
+  
+.photo-row {  
+    -fx-border-color: -color-border-subtle;  
+    -fx-border-width: 0 0 1 0;  
+}  
+  
+/* ---------- Badges ---------- */  
+.card-type-badge {  
+    -fx-background-radius: 6;  
+    -fx-padding: 3 8;  
+    -fx-font-size: 10px;  
+    -fx-font-weight: bold;  
+}  
+  
+.badge-hotel  { -fx-background-color: #ede9fe; -fx-text-fill: #6d28d9; }  
+.badge-etage  { -fx-background-color: #e0f2fe; -fx-text-fill: #0369a1; }  
+.badge-piece  { -fx-background-color: #d1fae5; -fx-text-fill: #047857; }  
+.badge-louee  { -fx-background-color: #fee2e2; -fx-text-fill: #b91c1c; }  
+  
+.badge-distance {  
+    -fx-background-color: -color-accent-subtle;  
+    -fx-text-fill: -color-accent-fg;  
+    -fx-background-radius: 999;  
+    -fx-padding: 3 10;  
+    -fx-font-size: 11px;  
+    -fx-font-weight: 600;  
+}  
+  
+.badge-statut-active,  
+.badge-statut-louee,  
+.badge-statut-masquee,  
+.badge-principale {  
+    -fx-background-radius: 999;  
+    -fx-padding: 4 12;  
+    -fx-font-size: 11px;  
+    -fx-font-weight: bold;  
+}  
+  
+.badge-statut-active  { -fx-background-color: -color-success-subtle; -fx-text-fill: -color-success-fg; }  
+.badge-statut-louee   { -fx-background-color: -color-warning-subtle; -fx-text-fill: -color-warning-fg; }  
+.badge-statut-masquee { -fx-background-color: -color-danger-subtle;  -fx-text-fill: -color-danger-fg; }  
+.badge-principale     { -fx-text-fill: -color-warning-fg; }  
+  
+/* ---------- Favori (etoile) ---------- */  
+.btn-fav {  
+    -fx-background-color: rgba(255, 255, 255, 0.9);  
+    -fx-background-radius: 999;  
+    -fx-min-width: 32;  
+    -fx-min-height: 32;  
+    -fx-max-width: 32;  
+    -fx-max-height: 32;  
+    -fx-padding: 0;  
+    -fx-cursor: hand;  
+    -fx-font-size: 14px;  
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 4, 0, 0, 1);  
+}  
+  
+.btn-fav:hover {  
+    -fx-background-color: #ffffff;  
+    -fx-scale-x: 1.12;  
+    -fx-scale-y: 1.12;  
+}  
+  
+/* ---------- Detail d'une annonce ---------- */  
+.detail-pane {  
+    -fx-background-color: -color-bg-default;  
+    -fx-padding: 24;  
+}  
+  
+.detail-title {  
+    -fx-font-size: 24px;  
+    -fx-font-weight: bold;  
+    -fx-text-fill: -color-fg-default;  
+}  
+  
+.detail-price {  
+    -fx-font-size: 22px;  
+    -fx-font-weight: 800;  
+    -fx-text-fill: -color-accent-fg;  
+}  
+  
+.detail-box {  
+    -fx-background-color: -color-bg-default;  
+    -fx-background-radius: 12;  
+    -fx-border-color: -color-border-muted;  
+    -fx-border-radius: 12;  
+    -fx-padding: 16;  
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.05), 8, 0, 0, 2);  
+}  
+  
+.contact-card {  
+    -fx-background-color: -color-accent-subtle;  
+    -fx-background-radius: 12;  
+    -fx-border-color: -color-accent-muted;  
+    -fx-border-radius: 12;  
+    -fx-padding: 16;  
+}  
+  
+.contact-card-locked {  
+    -fx-background-color: -color-bg-subtle;  
+    -fx-background-radius: 12;  
+    -fx-border-color: -color-border-muted;  
+    -fx-border-radius: 12;  
+    -fx-padding: 16;  
+}  
+  
+/* ---------- Boutons d'action ---------- */  
+.btn-primary-custom,  
+.btn-success-custom,  
+.btn-danger-custom,  
+.btn-warning-custom,  
+.btn-info-custom {  
+    -fx-text-fill: #ffffff;  
+    -fx-font-weight: bold;  
+    -fx-background-radius: 8;  
+    -fx-background-insets: 0;  
+    -fx-border-color: transparent;  
+    -fx-padding: 8 18;  
+    -fx-cursor: hand;  
+}  
+  
+.btn-primary-custom { -fx-background-color: -color-accent-emphasis; }  
+.btn-info-custom    { -fx-background-color: -color-accent-emphasis; }  
+.btn-success-custom { -fx-background-color: -color-success-emphasis; }  
+.btn-danger-custom  { -fx-background-color: -color-danger-emphasis; }  
+.btn-warning-custom { -fx-background-color: -color-warning-emphasis; }  
+  
+.btn-primary-custom:hover,  
+.btn-success-custom:hover,  
+.btn-danger-custom:hover,  
+.btn-warning-custom:hover,  
+.btn-info-custom:hover {  
+    -fx-opacity: 0.88;  
+}  
+  
+.btn-primary-custom:disabled,  
+.btn-success-custom:disabled,  
+.btn-danger-custom:disabled,  
+.btn-warning-custom:disabled,  
+.btn-info-custom:disabled {  
+    -fx-opacity: 0.45;  
+}  
+  
+/* ---------- Notifications ---------- */  
+.toast-success {  
+    -fx-background-color: -color-success-emphasis;  
+    -fx-text-fill: #ffffff;  
+    -fx-background-radius: 10;  
+    -fx-padding: 10 18;  
+    -fx-font-weight: 600;  
+}  
+  
+.toast-error {  
+    -fx-background-color: -color-danger-emphasis;  
+    -fx-text-fill: #ffffff;  
+    -fx-background-radius: 10;  
+    -fx-padding: 10 18;  
+    -fx-font-weight: 600;  
+}  

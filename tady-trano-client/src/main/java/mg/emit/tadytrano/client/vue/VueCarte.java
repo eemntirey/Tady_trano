@@ -62,7 +62,7 @@ public class VueCarte extends VBox {
 
         barreOutils.getChildren().addAll(titre, espace, new Label("Centrer sur :"), btnFianar, btnTana, btnRafraichir);
 
-        infoLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px;");
+        infoLabel.getStyleClass().add("muted");
 
         getChildren().addAll(barreOutils, infoLabel, new Separator(), carteView);
     }

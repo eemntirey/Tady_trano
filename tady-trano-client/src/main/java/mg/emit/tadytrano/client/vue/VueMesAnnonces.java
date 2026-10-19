@@ -57,7 +57,7 @@ public class VueMesAnnonces extends VBox {
         HBox.setHgrow(espace, Priority.ALWAYS);
 
         Button nouvelleAnnonce = new Button("+ Publier une annonce");
-        nouvelleAnnonce.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16;");
+        nouvelleAnnonce.getStyleClass().add("btn-success-custom");
         nouvelleAnnonce.setOnAction(e -> ouvrirFormulaire(null));
 
         enTete.getChildren().addAll(titre, espace, nouvelleAnnonce);
@@ -82,7 +82,7 @@ public class VueMesAnnonces extends VBox {
 
         ScrollPane scroll = new ScrollPane(listeAnnonces);
         scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        scroll.getStyleClass().add("scroll-transparent");
 
         getChildren().addAll(enTete, new Separator(), messageVide, scroll, pagination);
     }
@@ -121,7 +121,7 @@ public class VueMesAnnonces extends VBox {
         HBox ligne = new HBox(15);
         ligne.setAlignment(Pos.CENTER_LEFT);
         ligne.setPadding(new Insets(12));
-        ligne.setStyle("-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 4, 0, 0, 1);");
+        ligne.getStyleClass().add("list-row");
 
         ImageView image = Affichage.vignette(a.urlPhotoPrincipale(), 120, 80);
 
@@ -132,11 +132,11 @@ public class VueMesAnnonces extends VBox {
         String loc = (a.quartier() != null ? a.quartier().nom() + ", " : "")
                 + (a.quartier() != null && a.quartier().ville() != null ? a.quartier().ville().nom() : "");
         Label locLabel = new Label(loc + " • " + a.nbPieces() + " pièce(s)");
-        locLabel.setStyle("-fx-text-fill: #7f8c8d;");
+        locLabel.getStyleClass().add("card-location");
 
         Label prix = new Label(Affichage.prix(a.prix()));
         prix.setFont(Font.font("System", FontWeight.BOLD, 14));
-        prix.setStyle("-fx-text-fill: #27ae60;");
+        prix.getStyleClass().add("card-price");
 
         infos.getChildren().addAll(titre, locLabel, prix);
         HBox.setHgrow(infos, Priority.ALWAYS);
@@ -145,9 +145,9 @@ public class VueMesAnnonces extends VBox {
         Label statutBadge = new Label(a.statut());
         statutBadge.setPadding(new Insets(4, 8, 4, 8));
         switch (a.statut()) {
-            case "ACTIVE" -> statutBadge.setStyle("-fx-background-color: #d4edda; -fx-text-fill: #155724; -fx-background-radius: 4; -fx-font-weight: bold;");
-            case "LOUEE" -> statutBadge.setStyle("-fx-background-color: #fff3cd; -fx-text-fill: #856404; -fx-background-radius: 4; -fx-font-weight: bold;");
-            default -> statutBadge.setStyle("-fx-background-color: #f8d7da; -fx-text-fill: #721c24; -fx-background-radius: 4; -fx-font-weight: bold;");
+            case "ACTIVE" -> statutBadge.getStyleClass().add("badge-statut-active");
+            case "LOUEE" -> statutBadge.getStyleClass().add("badge-statut-louee");
+            default -> statutBadge.getStyleClass().add("badge-statut-masquee");
         }
 
         // Actions
@@ -161,7 +161,7 @@ public class VueMesAnnonces extends VBox {
         modifierBtn.setOnAction(e -> ouvrirFormulaire(a.id()));
 
         Button supprimerBtn = new Button("Supprimer");
-        supprimerBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
+        supprimerBtn.getStyleClass().add("btn-danger-custom");
         supprimerBtn.setOnAction(e -> confirmerSuppression(a));
 
         HBox boutons = new HBox(8, statutBadge, photosBtn, statutBtn, modifierBtn, supprimerBtn);
@@ -342,7 +342,7 @@ public class VueMesAnnonces extends VBox {
         urlF.setPrefWidth(320);
         CheckBox principaleCb = new CheckBox("Principale");
         Button ajouterBtn = new Button("Ajouter");
-        ajouterBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white;");
+        ajouterBtn.getStyleClass().add("btn-success-custom");
 
         ajoutBox.getChildren().addAll(urlF, principaleCb, ajouterBtn);
 
@@ -361,18 +361,18 @@ public class VueMesAnnonces extends VBox {
                     HBox ligne = new HBox(10);
                     ligne.setAlignment(Pos.CENTER_LEFT);
                     ligne.setPadding(new Insets(6));
-                    ligne.setStyle("-fx-border-color: #ecf0f1; -fx-border-width: 0 0 1 0;");
+                    ligne.getStyleClass().add("photo-row");
 
                     ImageView iv = Affichage.vignette(p.url(), 70, 50);
                     Label badge = new Label(p.principale() ? "★ Principale" : "");
-                    badge.setStyle("-fx-text-fill: #f39c12; -fx-font-weight: bold;");
+                    badge.getStyleClass().add("badge-principale");
 
                     Label urlLbl = new Label(p.url());
                     urlLbl.setMaxWidth(200);
                     HBox.setHgrow(urlLbl, Priority.ALWAYS);
 
                     Button delBtn = new Button("✕");
-                    delBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
+                    delBtn.getStyleClass().add("btn-danger-custom");
                     delBtn.setOnAction(ev -> app.appeler(() -> {
                         api.supprimerPhoto(annonceId, p.id());
                         return null;

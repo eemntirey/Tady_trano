@@ -66,14 +66,14 @@ public class VueRecherche extends VBox {
         setPadding(new Insets(15));
 
         Label titre = new Label("Rechercher un logement");
-        titre.setFont(Font.font("System", FontWeight.BOLD, 20));
+        titre.getStyleClass().add("page-title");
 
         // --- filtres ---
         GridPane filtres = new GridPane();
         filtres.setHgap(10);
         filtres.setVgap(8);
         filtres.setPadding(new Insets(10));
-        filtres.setStyle("-fx-background-color: #f4f6f7; -fx-background-radius: 6;");
+        filtres.getStyleClass().add("filter-bar");
 
         ville.setPromptText("Ville");
         ville.setPrefWidth(160);
@@ -99,6 +99,7 @@ public class VueRecherche extends VBox {
 
         Button lancer = new Button("Rechercher");
         lancer.setDefaultButton(true);
+        lancer.getStyleClass().add("btn-primary-custom");
         lancer.setOnAction(e -> {
             page = 0;
             rechercher();
@@ -190,17 +191,21 @@ public class VueRecherche extends VBox {
         if (type.getValue() != null) {
             filtres.put("typeLocationId", String.valueOf(type.getValue().id()));
         }
-        if (prixMin.getValue() > 0) {
-            filtres.put("prixMin", String.valueOf(prixMin.getValue()));
+        Integer pMin = valeur(prixMin);
+        Integer pMax = valeur(prixMax);
+        Integer nbMin = valeur(piecesMin);
+        Integer nbMax = valeur(piecesMax);
+        if (pMin > 0) {
+            filtres.put("prixMin", String.valueOf(pMin));
         }
-        if (prixMax.getValue() > 0) {
-            filtres.put("prixMax", String.valueOf(prixMax.getValue()));
+        if (pMax > 0) {
+            filtres.put("prixMax", String.valueOf(pMax));
         }
-        if (piecesMin.getValue() > 1) {
-            filtres.put("nbPiecesMin", String.valueOf(piecesMin.getValue()));
+        if (nbMin > 1) {
+            filtres.put("nbPiecesMin", String.valueOf(nbMin));
         }
-        if (piecesMax.getValue() > piecesMin.getValue()) {
-            filtres.put("nbPiecesMax", String.valueOf(piecesMax.getValue()));
+        if (nbMax > nbMin) {
+            filtres.put("nbPiecesMax", String.valueOf(nbMax));
         }
 
         Map<String, String> finaux = filtres;
@@ -227,37 +232,43 @@ public class VueRecherche extends VBox {
         VBox carte = new VBox(4);
         carte.setPadding(new Insets(8));
         carte.setPrefWidth(240);
-        carte.setStyle("-fx-background-color: white; -fx-background-radius: 6;"
-                + " -fx-border-color: #ddd; -fx-border-radius: 6; -fx-cursor: hand;");
+        carte.getStyleClass().add("annonce-card");
 
         carte.getChildren().add(Affichage.vignette(annonce.urlPhotoPrincipale(), 224, 130));
 
         Label titre = new Label(annonce.titre());
-        titre.setFont(Font.font("System", FontWeight.BOLD, 14));
+        titre.getStyleClass().add("card-title");
         titre.setWrapText(true);
         titre.setMaxHeight(36);
 
         Label prix = new Label(Affichage.prix(annonce.prix()));
-        prix.setStyle("-fx-text-fill: #1a5276; -fx-font-weight: bold; -fx-font-size: 14;");
+        prix.getStyleClass().add("card-price");
 
         String lieu = annonce.quartier() == null ? "" : annonce.quartier().toString();
         Label quartierLabel = new Label(lieu);
-        quartierLabel.setStyle("-fx-text-fill: #777;");
+        quartierLabel.getStyleClass().add("card-location");
 
         Label details = new Label(annonce.nbPieces() + " pieces"
                 + (annonce.surface() != null ? " - " + annonce.surface() + " m2" : ""));
-        details.setStyle("-fx-text-fill: #777;");
+        details.getStyleClass().add("card-specs");
 
         carte.getChildren().addAll(titre, prix, quartierLabel, details);
 
         if (annonce.distanceKm() != null) {
             Label distance = new Label(Affichage.distance(annonce.distanceKm()) + " de vous");
-            distance.setStyle("-fx-text-fill: #27ae60;");
+            distance.getStyleClass().add("badge-distance");
             carte.getChildren().add(distance);
         }
 
         carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), this::rechercher));
         return carte;
+    }
+
+    /** Valeur d'un Spinner editable : getValue() peut etre null tant que l'edition
+     *  n'est pas validee, on retombe alors sur 0. */
+    private static int valeur(Spinner<Integer> spinner) {
+        Integer v = spinner.getValue();
+        return v != null ? v : 0;
     }
 
     private static Spinner<Integer> entier(int valeur, int min, int max) {

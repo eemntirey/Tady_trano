@@ -87,7 +87,7 @@ public class VueAdmin extends VBox {
 
         ScrollPane scroll = new ScrollPane(listeAdmin);
         scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        scroll.getStyleClass().add("scroll-transparent");
 
         getChildren().addAll(enTete, new Separator(), messageVide, scroll, pagination);
     }
@@ -122,7 +122,7 @@ public class VueAdmin extends VBox {
         HBox ligne = new HBox(15);
         ligne.setAlignment(Pos.CENTER_LEFT);
         ligne.setPadding(new Insets(12));
-        ligne.setStyle("-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 4, 0, 0, 1);");
+        ligne.getStyleClass().add("list-row");
 
         ImageView image = Affichage.vignette(a.urlPhotoPrincipale(), 110, 75);
 
@@ -133,7 +133,7 @@ public class VueAdmin extends VBox {
         String loc = (a.quartier() != null ? a.quartier().nom() + ", " : "")
                 + (a.quartier() != null && a.quartier().ville() != null ? a.quartier().ville().nom() : "");
         Label locLabel = new Label(loc + " • " + a.nbPieces() + " pièce(s) • " + Affichage.prix(a.prix()));
-        locLabel.setStyle("-fx-text-fill: #7f8c8d;");
+        locLabel.getStyleClass().add("card-location");
 
         infos.getChildren().addAll(idTitre, locLabel);
         HBox.setHgrow(infos, Priority.ALWAYS);
@@ -142,9 +142,9 @@ public class VueAdmin extends VBox {
         Label statutBadge = new Label(a.statut());
         statutBadge.setPadding(new Insets(4, 8, 4, 8));
         switch (a.statut()) {
-            case "ACTIVE" -> statutBadge.setStyle("-fx-background-color: #d4edda; -fx-text-fill: #155724; -fx-background-radius: 4; -fx-font-weight: bold;");
-            case "LOUEE" -> statutBadge.setStyle("-fx-background-color: #fff3cd; -fx-text-fill: #856404; -fx-background-radius: 4; -fx-font-weight: bold;");
-            default -> statutBadge.setStyle("-fx-background-color: #f8d7da; -fx-text-fill: #721c24; -fx-background-radius: 4; -fx-font-weight: bold;");
+            case "ACTIVE" -> statutBadge.getStyleClass().add("badge-statut-active");
+            case "LOUEE" -> statutBadge.getStyleClass().add("badge-statut-louee");
+            default -> statutBadge.getStyleClass().add("badge-statut-masquee");
         }
 
         // Actions de moderation
@@ -152,12 +152,12 @@ public class VueAdmin extends VBox {
         detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), this::charger));
 
         Button activerBtn = new Button("Valider / Activer");
-        activerBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white;");
+        activerBtn.getStyleClass().add("btn-success-custom");
         activerBtn.setOnAction(e -> moderer(a.id(), "ACTIVE"));
         activerBtn.setDisable("ACTIVE".equals(a.statut()));
 
         Button masquerBtn = new Button("Masquer (Abus)");
-        masquerBtn.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white;");
+        masquerBtn.getStyleClass().add("btn-warning-custom");
         masquerBtn.setOnAction(e -> moderer(a.id(), "MASQUEE"));
         masquerBtn.setDisable("MASQUEE".equals(a.statut()));
 

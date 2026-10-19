@@ -61,7 +61,7 @@ public class VueProfil extends VBox {
         // Informations de base
         VBox infosCompte = new VBox(10);
         infosCompte.setPadding(new Insets(15));
-        infosCompte.setStyle("-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8;");
+        infosCompte.getStyleClass().add("detail-box");
 
         Label titreCompte = new Label("Informations personnelles");
         titreCompte.setFont(Font.font("System", FontWeight.BOLD, 16));
@@ -78,14 +78,14 @@ public class VueProfil extends VBox {
         gridCompte.add(new Label("Rôle sur la plateforme :"), 0, 3);
         gridCompte.add(roleVal, 1, 3);
 
-        emailVal.setStyle("-fx-font-weight: bold;");
-        roleVal.setStyle("-fx-font-weight: bold; -fx-text-fill: #2980b9;");
+        emailVal.getStyleClass().add("strong");
+        roleVal.getStyleClass().add("role-value");
 
         infosCompte.getChildren().addAll(titreCompte, gridCompte);
 
         // Section Coordonnees proprietaire (F4.2)
         sectionProprio.setPadding(new Insets(15));
-        sectionProprio.setStyle("-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8;");
+        sectionProprio.getStyleClass().add("detail-box");
 
         Label titreProprio = new Label("Coordonnées Propriétaire / Agence (visibles sur vos annonces)");
         titreProprio.setFont(Font.font("System", FontWeight.BOLD, 16));
@@ -114,10 +114,10 @@ public class VueProfil extends VBox {
         gridProprio.add(new Label("Quartier :"), 0, 5);
         gridProprio.add(comboQuartier, 1, 5);
 
-        btnEnregistrerProprio.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16;");
+        btnEnregistrerProprio.getStyleClass().add("btn-success-custom");
         btnEnregistrerProprio.setOnAction(e -> enregistrerProprio());
 
-        statutProprio.setStyle("-fx-text-fill: #27ae60;");
+        statutProprio.getStyleClass().setAll("label", "success-text");
 
         comboVille.setOnAction(e -> chargerQuartiers());
 
@@ -125,7 +125,7 @@ public class VueProfil extends VBox {
 
         ScrollPane scroll = new ScrollPane(new VBox(15, titre, new Separator(), infosCompte, sectionProprio));
         scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        scroll.getStyleClass().add("scroll-transparent");
 
         getChildren().add(scroll);
         basculerType();
@@ -216,7 +216,7 @@ public class VueProfil extends VBox {
         statutProprio.setText("");
         String telephone = champTelephone.getText().trim();
         if (telephone.isBlank()) {
-            statutProprio.setStyle("-fx-text-fill: #c0392b;");
+            statutProprio.getStyleClass().setAll("label", "error-text");
             statutProprio.setText("Le téléphone de contact est obligatoire.");
             return;
         }
@@ -231,12 +231,12 @@ public class VueProfil extends VBox {
         if (!profilExiste) {
             app.appeler(() -> api.creerProfilProprietaire(req), resp -> {
                 profilExiste = true;
-                statutProprio.setStyle("-fx-text-fill: #27ae60;");
+                statutProprio.getStyleClass().setAll("label", "success-text");
                 statutProprio.setText("Profil propriétaire créé avec succès !");
             });
         } else {
             app.appeler(() -> api.modifierProfilProprietaire(req), resp -> {
-                statutProprio.setStyle("-fx-text-fill: #27ae60;");
+                statutProprio.getStyleClass().setAll("label", "success-text");
                 statutProprio.setText("Profil propriétaire mis à jour !");
             });
         }
