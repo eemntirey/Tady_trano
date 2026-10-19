@@ -38,7 +38,8 @@ public interface AnnonceRepository extends JpaRepository<Annonce, Long> {
               AND (:nbPiecesMin IS NULL OR a.nbPieces >= :nbPiecesMin)
                AND (:nbPiecesMax IS NULL OR a.nbPieces <= :nbPiecesMax)
             ORDER BY CASE
-                       WHEN :lat IS NULL OR a.latitude IS NULL OR a.longitude IS NULL THEN 1000000000.0
+                       WHEN :lat IS NULL OR :lng IS NULL
+                         OR a.latitude IS NULL OR a.longitude IS NULL THEN 1000000000.0
                        ELSE 6371.0 * acos(least(1.0, greatest(-1.0,
                              cos(radians(:lat)) * cos(radians(a.latitude)) *
                              cos(radians(a.longitude) - radians(:lng)) +
