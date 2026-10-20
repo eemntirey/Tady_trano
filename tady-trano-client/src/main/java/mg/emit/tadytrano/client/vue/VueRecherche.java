@@ -72,6 +72,7 @@ public class VueRecherche extends VBox {
     private final FlowPane liste = new FlowPane();
     private final ScrollPane defilement = new ScrollPane();
     private final Label etat = new Label();
+    private final Button lancer = new Button("Rechercher");
     private final Button reessayer = new Button("Reessayer");
 
     /** Prochaine page à charger (défilement continu). */
@@ -173,7 +174,6 @@ public class VueRecherche extends VBox {
 
         // --- pastilles de filtres rapides + actions ---
         pastilles.getStyleClass().add("chips-row");
-        Button lancer = new Button("Rechercher");
         lancer.setDefaultButton(true);
         lancer.getStyleClass().add("btn-primary-custom");
         lancer.setOnAction(e -> {
@@ -447,6 +447,7 @@ public class VueRecherche extends VBox {
 
     /** Nouvelle recherche : réinitialise la liste et fige les filtres pour ses pages. */
     private void rechercher() {
+        lancer.setDisable(true);
         generation++;
         page = 0;
         toutCharge = false;
@@ -511,6 +512,9 @@ public class VueRecherche extends VBox {
                     if (gen != generation) {
                         return; // une recherche plus récente a été lancée
                     }
+                    if (pageDemandee == 0) {
+                        lancer.setDisable(false);
+                    }
                     for (AnnonceResumeResponse annonce : reponse.contenu()) {
                         liste.getChildren().add(carte(annonce));
                     }
@@ -523,6 +527,9 @@ public class VueRecherche extends VBox {
                 erreur -> {
                     if (gen != generation) {
                         return; // ignore l'erreur d'une requête périmée
+                    }
+                    if (pageDemandee == 0) {
+                        lancer.setDisable(false);
                     }
                     chargementEnCours = false;
                     erreurSuite = true;

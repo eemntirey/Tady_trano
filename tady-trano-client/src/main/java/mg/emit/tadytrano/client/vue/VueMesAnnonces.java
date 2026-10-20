@@ -29,7 +29,10 @@ public class VueMesAnnonces extends VBox {
     private final ApiClient api;
 
     private final VBox listeAnnonces = new VBox(12);
+    private final Button nouvelleAnnonce = new Button("+ Publier une annonce");
     private final Label pageLabel = new Label();
+    /** Empêche la création/modification concurrente depuis cette vue propriétaire. */
+    private boolean enregistrementAnnonceEnCours = false;
     private final Button precedent = new Button("<");
     private final Button suivant = new Button(">");
     private final Label messageVide = new Label("Aucune annonce publiée pour le moment.");
@@ -59,7 +62,6 @@ public class VueMesAnnonces extends VBox {
         Region espace = new Region();
         HBox.setHgrow(espace, Priority.ALWAYS);
 
-        Button nouvelleAnnonce = new Button("+ Publier une annonce");
         nouvelleAnnonce.getStyleClass().add("btn-success-custom");
         // Le serveur exige le role PROPRIETAIRE pour POST /api/annonces :
         // on bloque tot avec un message clair au lieu du 403.
@@ -213,6 +215,9 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void ouvrirChangementStatut(AnnonceResumeResponse a, Button bouton) {
+        if (!verifierAucuneSauvegardeAnnonce()) {
+            return;
+        }
         ChoiceDialog<String> dialog = new ChoiceDialog<>(a.statut(), "ACTIVE", "LOUEE", "MASQUEE");
         dialog.setTitle("Statut de l'annonce");
         dialog.setHeaderText("Modifier le statut de : " + a.titre());
@@ -237,6 +242,9 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void confirmerSuppression(AnnonceResumeResponse a, Button bouton) {
+        if (!verifierAucuneSauvegardeAnnonce()) {
+            return;
+        }
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Confirmation de suppression");
         alert.setHeaderText("Supprimer l'annonce : " + a.titre() + " ?");
@@ -261,6 +269,9 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void ouvrirFormulaire(Long idModification) {
+        if (!verifierAucuneSauvegardeAnnonce()) {
+            return;
+        }
         // Le menu n'est pas propose aux non-proprietaires ; garde interne aussi.
         if (!app.estProprietaire()) {
             Affichage.erreur(new IllegalArgumentException(
@@ -409,18 +420,47 @@ public class VueMesAnnonces extends VBox {
 
         Optional<AnnonceRequest> resultat = dialog.showAndWait();
         resultat.ifPresent(req -> {
+            // Le dialogue se ferme avant la réponse HTTP : bloquer aussi la réouverture
+            // d'un second formulaire tant que la première sauvegarde est en cours.
+            if (!verifierAucuneSauvegardeAnnonce()) {
+                return;
+            }
+            enregistrementAnnonceEnCours = true;
+            nouvelleAnnonce.setDisable(true);
             if (idModification == null) {
                 app.appeler(() -> api.creerAnnonce(req), r -> {
+                    terminerEnregistrementAnnonce();
                     charger();
                     Affichage.succes("Annonce publiée.");
+                }, err -> {
+                    terminerEnregistrementAnnonce();
+                    app.gererErreur(err);
                 });
             } else {
                 app.appeler(() -> api.modifierAnnonce(idModification, req), r -> {
+                    terminerEnregistrementAnnonce();
                     charger();
                     Affichage.succes("Annonce mise à jour.");
+                }, err -> {
+                    terminerEnregistrementAnnonce();
+                    app.gererErreur(err);
                 });
             }
         });
+    }
+
+    private boolean verifierAucuneSauvegardeAnnonce() {
+        if (!enregistrementAnnonceEnCours) {
+            return true;
+        }
+        Affichage.erreur(new IllegalStateException(
+                "Une publication ou modification d'annonce est déjà en cours. Réessayez après sa réponse."));
+        return false;
+    }
+
+    private void terminerEnregistrementAnnonce() {
+        enregistrementAnnonceEnCours = false;
+        nouvelleAnnonce.setDisable(false);
     }
 
     private AnnonceRequest construireDemande(TextField titreF, TextArea descF,
@@ -556,6 +596,9 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void ouvrirGestionPhotos(Long annonceId) {
+        if (!verifierAucuneSauvegardeAnnonce()) {
+            return;
+        }
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Gestion des photos de l'annonce #" + annonceId);
         dialog.setHeaderText("Photos associées au bien (max 10 photos)");
