@@ -27,10 +27,22 @@ Projet Maven multi-module :
 
 ## Prérequis
 
-- **JDK** : l'API vise Java 21 (`java.version` dans le `pom.xml` racine). Le client utilise JavaFX 27 ; le projet est développé avec un JDK 27 (voir `javafx.version` dans `tady-trano-client/pom.xml`).
+- **JDK de l'API** : Java 21 est la version cible (`java.version` dans le `pom.xml` racine).
+- **JDK minimal du client** : Java 25 ou ultérieur, car JavaFX 27 exige JDK 25 minimum.
+- **JDK testé en CI** : Eclipse Temurin 25, sur le runner Ubuntu de GitHub Actions. Le projet indique JDK 27 comme environnement de développement local ; vérifie la version active sur ta machine avec `java -version`.
+- **JavaFX** : version 27 (`javafx.version` dans `tady-trano-client/pom.xml`). La carte utilise `WebView` et le pont Java/JavaScript `jdk.jsobject` ; toute mise à jour JavaFX/JDK doit être revalidée sur cette partie.
+- **Systèmes vérifiés** : Ubuntu Linux pour la compilation et les tests automatisés CI ; Windows 11 est l'environnement de développement déclaré, mais le workflow CI ne valide pas le rendu graphique de JavaFX/WebView sous Windows. macOS n'est pas validé par le workflow actuel.
 - **Maven** 3.9 ou plus récent.
 - **MySQL ou MariaDB** : uniquement pour le mode avec base persistante (le mode rapide utilise H2 en mémoire).
 - **Connexion internet** pour la carte (Leaflet et les tuiles OpenStreetMap sont chargés en ligne).
+
+Pour vérifier le JDK actif et les dépendances JavaFX résolues (JavaFX Web, Controls, etc.) :
+
+```bash
+java -version && mvn -pl tady-trano-client -q dependency:tree -Dincludes=org.openjfx
+```
+
+Dans Windows PowerShell 5.1, exécute ces deux commandes séparément si l'opérateur `&&` n'est pas pris en charge.
 
 ## Démarrage rapide (sans base de données)
 
