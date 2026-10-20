@@ -11,6 +11,7 @@ import javafx.scene.text.FontWeight;
 import mg.emit.tadytrano.client.TadyTranoApp;
 import mg.emit.tadytrano.client.api.ApiClient;
 import mg.emit.tadytrano.client.dto.*;
+import mg.emit.tadytrano.client.util.ActionEnCours;
 import mg.emit.tadytrano.client.util.Affichage;
 
 import java.math.BigDecimal;
@@ -29,6 +30,8 @@ public class VueMesAnnonces extends VBox {
     private final ApiClient api;
 
     private final VBox listeAnnonces = new VBox(12);
+    private final Button nouvelleAnnonce = new Button("+ Publier une annonce");
+    private final ActionEnCours enregistrementAnnonce = new ActionEnCours();
     private final Label pageLabel = new Label();
     private final Button precedent = new Button("<");
     private final Button suivant = new Button(">");
@@ -36,8 +39,10 @@ public class VueMesAnnonces extends VBox {
 
     private int page = 0;
     private int totalPages = 0;
-    /** Numero de sequence : ignore les reponses perimee d'une requete anterieure. */
+    /** Numero de sequence : ignore les reponses perimees d'une requete anterieure. */
     private int generation = 0;
+    /** Generation du GET qui doit confirmer la fin d'une sauvegarde. */
+    private int generationRafraichissementEnregistrement = -1;
 
     public VueMesAnnonces(TadyTranoApp app, ApiClient api) {
         this.app = app;
@@ -59,7 +64,6 @@ public class VueMesAnnonces extends VBox {
         Region espace = new Region();
         HBox.setHgrow(espace, Priority.ALWAYS);
 
-        Button nouvelleAnnonce = new Button("+ Publier une annonce");
         nouvelleAnnonce.getStyleClass().add("btn-success-custom");
         // Le serveur exige le role PROPRIETAIRE pour POST /api/annonces :
         // on bloque tot avec un message clair au lieu du 403.
@@ -76,13 +80,13 @@ public class VueMesAnnonces extends VBox {
 
         // Pagination
         precedent.setOnAction(e -> {
-            if (page > 0) {
+            if (!enregistrementAnnonce.estEnCours() && page > 0) {
                 page--;
                 charger();
             }
         });
         suivant.setOnAction(e -> {
-            if (page < totalPages - 1) {
+            if (!enregistrementAnnonce.estEnCours() && page < totalPages - 1) {
                 page++;
                 charger();
             }
@@ -100,13 +104,23 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void charger() {
+        charger(false);
+    }
+
+    /** Autorise explicitement le GET lance apres une mutation. */
+    private void charger(boolean apresEnregistrement) {
+        if (enregistrementAnnonce.estEnCours() && !apresEnregistrement) {
+            return; // une lecture tardive ne doit pas liberer le verrou de sauvegarde
+        }
         if (!app.estConnecte()) {
+            terminerEnregistrementAnnonce();
             messageVide.setText("Veuillez vous connecter avec un compte Propriétaire pour voir vos annonces.");
             messageVide.setVisible(true);
             listeAnnonces.getChildren().clear();
             return;
         }
         if (!app.estProprietaire()) {
+            terminerEnregistrementAnnonce();
             messageVide.setText("L'espace « Mes annonces » est réservé aux comptes Propriétaire.");
             messageVide.setVisible(true);
             listeAnnonces.getChildren().clear();
@@ -120,23 +134,33 @@ public class VueMesAnnonces extends VBox {
                     if (gen != generation) {
                         return; // reponse perimee
                     }
-                    afficherResultats(reponse);
+                    afficherResultats(reponse, gen);
                 },
                 erreur -> {
                     if (gen != generation) {
                         return;
                     }
+                    if (generationRafraichissementEnregistrement == gen) {
+                        terminerEnregistrementAnnonce();
+                    }
                     app.gererErreur(erreur);
                 });
     }
 
-    private void afficherResultats(PageResponse<AnnonceResumeResponse> reponse) {
+    private void afficherResultats(PageResponse<AnnonceResumeResponse> reponse, int generationReponse) {
         // Apres une suppression : si la page courante n'existe plus, revenir a la derniere valide.
         if (reponse.contenu().isEmpty() && page > 0) {
             int dernierePage = Math.max(0, reponse.totalPages() - 1);
             if (dernierePage != page) {
                 page = dernierePage;
-                charger();
+                if (generationRafraichissementEnregistrement == generationReponse) {
+                    charger(true);
+                    if (enregistrementAnnonce.estEnCours()) {
+                        generationRafraichissementEnregistrement = generation;
+                    }
+                } else {
+                    charger();
+                }
                 return;
             }
         }
@@ -149,6 +173,7 @@ public class VueMesAnnonces extends VBox {
         if (reponse.contenu().isEmpty()) {
             messageVide.setText("Vous n'avez pas encore publié d'annonce. Cliquez sur '+ Publier une annonce' pour commencer.");
             messageVide.setVisible(true);
+            terminerSiRafraichissementEnregistrement(generationReponse);
             return;
         }
 
@@ -156,6 +181,7 @@ public class VueMesAnnonces extends VBox {
         for (AnnonceResumeResponse annonce : reponse.contenu()) {
             listeAnnonces.getChildren().add(creerLigneAnnonce(annonce));
         }
+        terminerSiRafraichissementEnregistrement(generationReponse);
     }
 
     private HBox creerLigneAnnonce(AnnonceResumeResponse a) {
@@ -213,6 +239,9 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void ouvrirChangementStatut(AnnonceResumeResponse a, Button bouton) {
+        if (enregistrementAnnonce.estEnCours()) {
+            return;
+        }
         ChoiceDialog<String> dialog = new ChoiceDialog<>(a.statut(), "ACTIVE", "LOUEE", "MASQUEE");
         dialog.setTitle("Statut de l'annonce");
         dialog.setHeaderText("Modifier le statut de : " + a.titre());
@@ -237,6 +266,9 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void confirmerSuppression(AnnonceResumeResponse a, Button bouton) {
+        if (enregistrementAnnonce.estEnCours()) {
+            return;
+        }
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Confirmation de suppression");
         alert.setHeaderText("Supprimer l'annonce : " + a.titre() + " ?");
@@ -265,6 +297,11 @@ public class VueMesAnnonces extends VBox {
         if (!app.estProprietaire()) {
             Affichage.erreur(new IllegalArgumentException(
                     "L'espace « Mes annonces » est réservé aux comptes Propriétaire."));
+            return;
+        }
+        // Une requête de publication/modification doit être terminée avant
+        // d'autoriser une seconde ouverture du formulaire.
+        if (enregistrementAnnonce.estEnCours()) {
             return;
         }
         Dialog<AnnonceRequest> dialog = new Dialog<>();
@@ -409,18 +446,54 @@ public class VueMesAnnonces extends VBox {
 
         Optional<AnnonceRequest> resultat = dialog.showAndWait();
         resultat.ifPresent(req -> {
+            // Le dialogue disparait avant la réponse HTTP : garder un verrou au
+            // niveau de la vue évite une seconde publication depuis la page.
+            if (!enregistrementAnnonce.demarrer()) {
+                return;
+            }
+            generation++; // invalider toute ancienne lecture de liste
+            nouvelleAnnonce.setDisable(true);
+            precedent.setDisable(true);
+            suivant.setDisable(true);
             if (idModification == null) {
                 app.appeler(() -> api.creerAnnonce(req), r -> {
-                    charger();
                     Affichage.succes("Annonce publiée.");
+                    rechargerApresEnregistrement();
+                }, err -> {
+                    terminerEnregistrementAnnonce();
+                    app.gererErreur(err);
                 });
             } else {
                 app.appeler(() -> api.modifierAnnonce(idModification, req), r -> {
-                    charger();
                     Affichage.succes("Annonce mise à jour.");
+                    rechargerApresEnregistrement();
+                }, err -> {
+                    terminerEnregistrementAnnonce();
+                    app.gererErreur(err);
                 });
             }
         });
+    }
+
+    private void rechargerApresEnregistrement() {
+        charger(true);
+        if (enregistrementAnnonce.estEnCours()) {
+            generationRafraichissementEnregistrement = generation;
+        }
+    }
+
+    private void terminerSiRafraichissementEnregistrement(int generationReponse) {
+        if (generationRafraichissementEnregistrement == generationReponse) {
+            terminerEnregistrementAnnonce();
+        }
+    }
+
+    private void terminerEnregistrementAnnonce() {
+        generationRafraichissementEnregistrement = -1;
+        enregistrementAnnonce.terminer();
+        nouvelleAnnonce.setDisable(false);
+        precedent.setDisable(page <= 0);
+        suivant.setDisable(page >= totalPages - 1 || totalPages == 0);
     }
 
     private AnnonceRequest construireDemande(TextField titreF, TextArea descF,
@@ -556,6 +629,9 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void ouvrirGestionPhotos(Long annonceId) {
+        if (enregistrementAnnonce.estEnCours()) {
+            return;
+        }
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Gestion des photos de l'annonce #" + annonceId);
         dialog.setHeaderText("Photos associées au bien (max 10 photos)");

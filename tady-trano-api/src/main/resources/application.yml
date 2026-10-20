@@ -2,11 +2,12 @@ spring:
   application:
     name: tady-trano-api
   datasource:
-    # En production (hors profil local/test), DB_URL, DB_USER et DB_PASSWORD
-    # doivent etre defines par variables d'environnement. Aucun fallback
-    # securisant n'est fournit : l'application refuse de demarrer sinon.
-    url: ${DB_URL:jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=true&serverTimezone=Indian/Antananarivo&characterEncoding=utf8}
-    username: ${DB_USER:root}
+    # DB_URL, DB_USER et DB_PASSWORD n'ont aucun fallback dans le profil par defaut.
+    # Le profil local remplace ces proprietes par une base H2 volatile.
+    # Hors profils local/test, ConfigurationSecurite exige les variables explicites
+    # et un sslMode MySQL strict avant la creation du DataSource.
+    url: ${DB_URL:}
+    username: ${DB_USER:}
     password: ${DB_PASSWORD:}
     hikari:
       maximum-pool-size: 10
