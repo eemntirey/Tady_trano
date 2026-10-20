@@ -16,6 +16,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import mg.emit.tadytrano.client.TadyTranoApp;
 import mg.emit.tadytrano.client.api.ApiClient;
@@ -303,12 +304,27 @@ public class VueRecherche extends VBox {
     // Referentiel (villes, quartiers, types) : champ, listes et pastilles
     // ------------------------------------------------------------------
 
+    private static volatile Referentiel referentielCache;
+
     private record Referentiel(List<VilleResponse> villes,
                                List<TypeLocationResponse> types,
                                List<QuartierResponse> quartiers) {
+        private Referentiel {
+            villes = List.copyOf(villes);
+            types = List.copyOf(types);
+            quartiers = List.copyOf(quartiers);
+        }
     }
 
     private void chargerReferentiel() {
+        // Les villes, quartiers et types changent rarement : eviter de refaire
+        // toutes les requetes REST a chaque retour sur l'ecran de recherche.
+        Referentiel cache = referentielCache;
+        if (cache != null) {
+            appliquerReferentiel(cache);
+            return;
+        }
+
         app.appeler(() -> {
             List<VilleResponse> villes = api.villes();
             List<TypeLocationResponse> types = api.typesLocation();
@@ -317,7 +333,10 @@ public class VueRecherche extends VBox {
                 quartiers.addAll(api.quartiers(ville.id()));
             }
             return new Referentiel(villes, types, quartiers);
-        }, this::appliquerReferentiel, app::gererErreur);
+        }, referentiel -> {
+            referentielCache = referentiel;
+            appliquerReferentiel(referentiel);
+        }, app::gererErreur);
     }
 
     private void appliquerReferentiel(Referentiel referentiel) {
@@ -583,14 +602,18 @@ public class VueRecherche extends VBox {
     /** Carte annonce cliquable (vignette pleine largeur + titre + prix + lieu). */
     private VBox carte(AnnonceResumeResponse annonce) {
         VBox carte = new VBox();
-        carte.setPrefWidth(190);
-        carte.setMaxWidth(190);
+        carte.setPrefWidth(230);
+        carte.setMaxWidth(230);
         carte.getStyleClass().add("annonce-card");
 
-        StackPane media = new StackPane(Affichage.vignette(annonce.urlPhotoPrincipale(), 190, 112));
+        StackPane media = new StackPane(Affichage.vignette(annonce.urlPhotoPrincipale(), 230, 136));
         media.getStyleClass().add("card-media");
-        media.setPrefSize(190, 112);
-        media.setMaxSize(190, 112);
+        media.setPrefSize(230, 136);
+        media.setMaxSize(230, 136);
+        Rectangle masqueArrondi = new Rectangle(230, 136);
+        masqueArrondi.setArcWidth(18);
+        masqueArrondi.setArcHeight(18);
+        media.setClip(masqueArrondi);
 
         VBox corps = new VBox(4);
         corps.getStyleClass().add("card-body");
@@ -598,7 +621,7 @@ public class VueRecherche extends VBox {
         Label titre = new Label(annonce.titre());
         titre.getStyleClass().add("card-title");
         titre.setWrapText(true);
-        titre.setMaxHeight(36);
+        titre.setMaxHeight(42);
 
         Label prixLabel = new Label(Affichage.prix(annonce.prix()));
         prixLabel.getStyleClass().add("card-price");
@@ -632,7 +655,7 @@ public class VueRecherche extends VBox {
 
         carte.getChildren().addAll(media, corps);
         // Réaffiche le même objet vue pour conserver la liste et sa position de défilement.
-        carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), () -> app.ouvrir(this)));
+        carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), () -> app.afficherSansHistorique(this)));
         return carte;
     }
 }

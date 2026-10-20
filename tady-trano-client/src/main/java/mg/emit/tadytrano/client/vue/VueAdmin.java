@@ -183,7 +183,7 @@ public class VueAdmin extends VBox {
 
         // Actions de moderation
         Button detailBtn = new Button("Aperçu");
-        detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), () -> { app.ouvrir(this); charger(); }));
+        detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), () -> { app.afficherSansHistorique(this); charger(); }));
 
         Button activerBtn = new Button("Valider / Activer");
         activerBtn.getStyleClass().add("btn-success-custom");

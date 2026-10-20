@@ -38,7 +38,14 @@ public class VueDetail extends VBox {
         setPadding(new Insets(15));
 
         Button boutonRetour = retourBtn;
-        boutonRetour.setOnAction(e -> retour.run());
+        boutonRetour.getStyleClass().add("btn-ghost");
+        boutonRetour.setOnAction(e -> {
+            if (retour != null) {
+                retour.run();
+            } else {
+                app.retour();
+            }
+        });
         getChildren().add(boutonRetour);
 
         app.appeler(() -> api.detail(annonceId), this::afficher);

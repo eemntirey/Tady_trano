@@ -4,10 +4,11 @@ import atlantafx.base.theme.PrimerDark;
 import atlantafx.base.theme.PrimerLight;
 import javafx.application.Application;
 import javafx.scene.Scene;
+import javafx.scene.Parent;
 
 /**
- * Gestion du theme de l'application (CDC 8.3 : theme clair et sombre).
- * Bascule dynamiquement entre Primer Light et Primer Dark d'AtlantaFX.
+ * Gestion du theme global. La classe CSS du root suit le theme courant afin
+ * que les styles a contraste renforce restent coherents lors de la bascule.
  */
 public class ThemeManager {
 
@@ -29,14 +30,23 @@ public class ThemeManager {
     }
 
     private void appliquerTheme() {
-        if (modeSombre) {
-            Application.setUserAgentStylesheet(new PrimerDark().getUserAgentStylesheet());
-        } else {
-            Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+        Application.setUserAgentStylesheet(modeSombre
+                ? new PrimerDark().getUserAgentStylesheet()
+                : new PrimerLight().getUserAgentStylesheet());
+
+        if (scene == null) {
+            return;
         }
 
-        if (scene != null) {
-            String cssPath = getClass().getResource("/mg/emit/tadytrano/client/css/styles.css").toExternalForm();
+        Parent root = scene.getRoot();
+        if (root != null) {
+            root.getStyleClass().removeAll("theme-dark", "theme-light");
+            root.getStyleClass().add(modeSombre ? "theme-dark" : "theme-light");
+        }
+
+        var css = getClass().getResource("/mg/emit/tadytrano/client/css/styles.css");
+        if (css != null) {
+            String cssPath = css.toExternalForm();
             if (!scene.getStylesheets().contains(cssPath)) {
                 scene.getStylesheets().add(cssPath);
             }

@@ -2,6 +2,8 @@ package mg.emit.tadytrano.client;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
+import javafx.scene.Parent;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
@@ -12,6 +14,10 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import mg.emit.tadytrano.client.api.ApiClient;
 import mg.emit.tadytrano.client.api.Session;
 import mg.emit.tadytrano.client.dto.AuthResponse;
@@ -39,6 +45,8 @@ public class TadyTranoApp extends Application {
     private Label utilisateur = new Label();
     private final ThemeManager themeManager = new ThemeManager();
     private final java.util.List<Button> boutonsNav = new java.util.ArrayList<>();
+    private final Deque<Node> historiqueVues = new ArrayDeque<>();
+    private final BooleanProperty retourDisponible = new SimpleBooleanProperty(false);
 
     public static void main(String[] args) {
         launch(args);
@@ -74,6 +82,12 @@ public class TadyTranoApp extends Application {
     // ------------------------------------------------------------------
 
     private HBox barreDeNavigation() {
+        Button retour = new Button("Retour");
+        retour.getStyleClass().add("nav-button");
+        retour.setOnAction(e -> retour());
+        retour.visibleProperty().bind(retourDisponible);
+        retour.managedProperty().bind(retour.visibleProperty());
+
         Button recherche = new Button("Rechercher");
         recherche.setOnAction(e -> ouvrir(new VueRecherche(this, api)));
 
@@ -107,7 +121,8 @@ public class TadyTranoApp extends Application {
         deconnexion.setOnAction(e -> {
             session.deconnecter();
             majBarre();
-            ouvrir(new VueConnexion(this, api));
+            effacerHistorique();
+            afficherSansEmpiler(new VueConnexion(this, api));
         });
         deconnexion.visibleProperty().bind(session.connecteProperty());
 
@@ -118,6 +133,11 @@ public class TadyTranoApp extends Application {
         admin.managedProperty().bind(admin.visibleProperty());
         deconnexion.getStyleClass().addAll("nav-button", "nav-button-danger");
         deconnexion.managedProperty().bind(deconnexion.visibleProperty());
+
+        Button aide = new Button("Aide");
+        aide.getStyleClass().add("nav-button");
+        aide.setTooltip(new Tooltip("Contacter le support ou signaler un problème"));
+        aide.setOnAction(e -> ouvrirContact());
 
         Button theme = new Button("Mode sombre");
         theme.getStyleClass().add("nav-button");
@@ -145,8 +165,8 @@ public class TadyTranoApp extends Application {
 
         Region poussiere = new Region();
         HBox.setHgrow(poussiere, Priority.ALWAYS);
-        HBox barre = new HBox(10, marque, recherche, carte, favoris, mesAnnonces, profil, connexion,
-                admin, poussiere, chargement, utilisateur, theme, deconnexion);
+        HBox barre = new HBox(10, marque, retour, recherche, carte, favoris, mesAnnonces, profil, connexion,
+                admin, aide, poussiere, chargement, utilisateur, theme, deconnexion);
         barre.getStyleClass().add("app-header");
         barre.setPrefHeight(48);
         return barre;
@@ -158,10 +178,63 @@ public class TadyTranoApp extends Application {
                 : "");
     }
 
-    /** Affiche une vue dans la zone centrale. */
-    public void ouvrir(javafx.scene.Parent vue) {
+    /** Affiche une vue et mémorise l'écran précédent pour le bouton Retour global. */
+    public void ouvrir(Parent vue) {
+        if (vue == null) {
+            return;
+        }
+        Node courante = racine.getCenter();
+        if (courante != null && courante != vue) {
+            historiqueVues.push(courante);
+        }
+        afficherSansEmpiler(vue);
+    }
+
+    /**
+     * Revient vers une vue déjà affichée sans créer une boucle dans l'historique.
+     * Supprime la cible du sommet si elle a été mémorisée lors de l'ouverture du détail.
+     */
+    public void afficherSansHistorique(Parent vue) {
+        if (vue == null) {
+            return;
+        }
+        if (!historiqueVues.isEmpty() && historiqueVues.peek() == vue) {
+            historiqueVues.pop();
+        }
+        afficherSansEmpiler(vue);
+    }
+
+    /** Retour vers la vue précédente, sans enregistrer la vue quittée à nouveau. */
+    public void retour() {
+        if (!historiqueVues.isEmpty()) {
+            afficherSansEmpiler(historiqueVues.pop());
+        } else {
+            afficherSansEmpiler(new VueRecherche(this, api));
+        }
+    }
+
+    private void afficherSansEmpiler(Node vue) {
         racine.setCenter(vue);
-        majBoutonActif(vue);
+        if (vue instanceof Parent parent) {
+            majBoutonActif(parent);
+        }
+        retourDisponible.set(!historiqueVues.isEmpty());
+    }
+
+    private void effacerHistorique() {
+        historiqueVues.clear();
+        retourDisponible.set(false);
+    }
+
+    /** Ouvre la page officielle de support pour contacter l'équipe et signaler un défaut. */
+    public void ouvrirContact() {
+        try {
+            getHostServices().showDocument("https://github.com/eemntirey/Tady_trano/issues/new");
+        } catch (RuntimeException ex) {
+            Affichage.erreur(new IllegalStateException(
+                    "Impossible d'ouvrir le navigateur. Le support est disponible à l'adresse "
+                            + "https://github.com/eemntirey/Tady_trano/issues/new", ex));
+        }
     }
 
     private void majBoutonActif(javafx.scene.Parent vue) {
@@ -184,14 +257,16 @@ public class TadyTranoApp extends Application {
     public void apresAuthentification(AuthResponse reponse) {
         session.connecter(reponse.token(), reponse.utilisateur());
         majBarre();
-        ouvrir(new VueRecherche(this, api));
+        effacerHistorique();
+        afficherSansEmpiler(new VueRecherche(this, api));
     }
 
     /** Rouvre la recherche (apres une erreur de session par exemple). */
     public void retourConnexion() {
         session.deconnecter();
         majBarre();
-        ouvrir(new VueConnexion(this, api));
+        effacerHistorique();
+        afficherSansEmpiler(new VueConnexion(this, api));
     }
 
     /** Vrai si un compte est connecte. */
