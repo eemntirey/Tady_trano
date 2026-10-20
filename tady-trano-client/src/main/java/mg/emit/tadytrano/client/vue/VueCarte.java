@@ -52,12 +52,26 @@ public class VueCarte extends VBox {
     private Double lngRepere;
     /** Sequence des chargements : ignore les reponses perimees. */
     private int generation = 0;
+    private boolean liberee;
 
     public VueCarte(TadyTranoApp app, ApiClient api) {
         this.app = app;
         this.api = api;
         construire();
         initialiserCarte();
+    }
+
+    /**
+     * À appeler uniquement lorsque cette vue est retirée de l'historique et abandonnée.
+     * Invalide les réponses API encore en vol avant de libérer la WebView.
+     */
+    public void liberer() {
+        if (liberee) {
+            return;
+        }
+        liberee = true;
+        generation++;
+        carteView.liberer();
     }
 
     private void construire() {
