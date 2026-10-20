@@ -3,6 +3,7 @@ package mg.emit.tadytrano.client;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.Parent;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
@@ -44,7 +45,7 @@ public class TadyTranoApp extends Application {
     private Label utilisateur = new Label();
     private final ThemeManager themeManager = new ThemeManager();
     private final java.util.List<Button> boutonsNav = new java.util.ArrayList<>();
-    private final Deque<Parent> historiqueVues = new ArrayDeque<>();
+    private final Deque<Node> historiqueVues = new ArrayDeque<>();
     private final BooleanProperty retourDisponible = new SimpleBooleanProperty(false);
 
     public static void main(String[] args) {
@@ -182,7 +183,7 @@ public class TadyTranoApp extends Application {
         if (vue == null) {
             return;
         }
-        Parent courante = racine.getCenter();
+        Node courante = racine.getCenter();
         if (courante != null && courante != vue) {
             historiqueVues.push(courante);
         }
@@ -212,9 +213,11 @@ public class TadyTranoApp extends Application {
         }
     }
 
-    private void afficherSansEmpiler(Parent vue) {
+    private void afficherSansEmpiler(Node vue) {
         racine.setCenter(vue);
-        majBoutonActif(vue);
+        if (vue instanceof Parent parent) {
+            majBoutonActif(parent);
+        }
         retourDisponible.set(!historiqueVues.isEmpty());
     }
 
