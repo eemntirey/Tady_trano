@@ -8,8 +8,15 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -186,6 +193,61 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                         .header("Authorization", "Bearer " + jeton))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.contenu[0].statut").value("MASQUEE"));
+    }
+
+    @Test
+    void deuxAjoutsSimultanesNeDepassentPasDixPhotos() throws Exception {
+        String jeton = proprietaireConnecte();
+        Long typeId = typeLocationId();
+        Long quartierId = jdbc.queryForObject("SELECT id FROM quartier LIMIT 1", Long.class);
+        mockMvc.perform(post("/api/annonces")
+                        .header("Authorization", "Bearer " + jeton)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(annonceJson(typeId, quartierId)))
+                .andExpect(status().isCreated());
+        Long annonceId = jdbc.queryForObject("SELECT id FROM annonce", Long.class);
+        String url = "/api/annonces/" + annonceId + "/photos";
+
+        for (int i = 1; i <= 9; i++) {
+            mockMvc.perform(post(url)
+                            .header("Authorization", "Bearer " + jeton)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"url\":\"https://cdn.tady.mg/concurrente-" + i + ".jpg\",\"principale\":false}"))
+                    .andExpect(status().isCreated());
+        }
+
+        CountDownLatch prets = new CountDownLatch(2);
+        CountDownLatch depart = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<Integer> tentative = () -> {
+                prets.countDown();
+                if (!depart.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Le depart concurrent n'a pas ete declenche");
+                }
+                return mockMvc.perform(post(url)
+                                .header("Authorization", "Bearer " + jeton)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"url\":\"https://cdn.tady.mg/concurrente-final.jpg\",\"principale\":false}"))
+                        .andReturn().getResponse().getStatus();
+            };
+            Future<Integer> premier = pool.submit(tentative);
+            Future<Integer> second = pool.submit(tentative);
+            assertTrue(prets.await(5, TimeUnit.SECONDS), "Les deux requetes doivent etre pretes");
+            depart.countDown();
+
+            int statutA = premier.get(10, TimeUnit.SECONDS);
+            int statutB = second.get(10, TimeUnit.SECONDS);
+            assertTrue((statutA == 201 && statutB == 400) || (statutA == 400 && statutB == 201),
+                    "Une seule requete doit reussir (201) et l'autre atteindre la limite (400), recus : "
+                            + statutA + ", " + statutB);
+            assertEquals(10, jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM photo WHERE annonce_id = ?", Integer.class, annonceId));
+        } finally {
+            depart.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS), "Les threads de test doivent terminer");
+        }
     }
 
     @Test
