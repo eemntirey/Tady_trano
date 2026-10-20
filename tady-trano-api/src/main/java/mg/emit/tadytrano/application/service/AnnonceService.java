@@ -37,8 +37,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -60,9 +58,6 @@ public class AnnonceService {
     private final TypeLocationRepository typeLocationRepository;
     private final ProprietaireService proprietaireService;
     private final ReferentielService referentielService;
-
-    // Verrous applicatifs par annonce pour serialiser les mutations concurrentes (A-05).
-    private final ConcurrentHashMap<Long, ReentrantLock> verrous = new ConcurrentHashMap<>();
 
     /**
      * Recherche publique : uniquement les annonces actives, filtres optionnels,
@@ -194,7 +189,7 @@ public class AnnonceService {
 
     @Transactional
     public void supprimer(String email, Long id) {
-        Annonce annonce = annonceDeProprietaire(email, id);
+        Annonce annonce = annonceDeProprietaireVerrouillee(email, id);
         favoriRepository.deleteByAnnonceId(id);
         photoRepository.deleteByAnnonceId(id);
         annonceRepository.delete(annonce);
@@ -239,13 +234,10 @@ public class AnnonceService {
 
     @Transactional
     public PhotoResponse ajouterPhoto(String email, Long annonceId, PhotoRequest demande) {
-        // Verrou applicatif par annonce pour serialiser les mutations concurrentes (A-05).
-        ReentrantLock verrou = verrous.computeIfAbsent(annonceId, k -> new ReentrantLock());
-        verrou.lock();
-        try {
-            Annonce annonce = annonceDeProprietaire(email, annonceId);
-            List<Photo> existantes = photoRepository.findByAnnonceIdOrderByOrdreAsc(annonceId);
-            if (existantes.size() >= MAX_PHOTOS_PAR_ANNONCE) {
+        // Le verrou pessimiste sur l'annonce reste détenu jusqu'au commit de cette transaction.
+        Annonce annonce = annonceDeProprietaireVerrouillee(email, annonceId);
+        List<Photo> existantes = photoRepository.findByAnnonceIdOrderByOrdreAsc(annonceId);
+        if (existantes.size() >= MAX_PHOTOS_PAR_ANNONCE) {
             throw new ApiException(HttpStatus.BAD_REQUEST,
                     "Nombre maximum de photos atteint (" + MAX_PHOTOS_PAR_ANNONCE + ")");
         }
@@ -266,14 +258,11 @@ public class AnnonceService {
         photo.setPrincipale(demande.principale() || existantes.isEmpty());
         photo.setOrdre(ordreSuivant);
         return PhotoResponse.depuis(photoRepository.save(photo));
-        } finally {
-            verrou.unlock();
-        }
     }
 
     @Transactional
     public void supprimerPhoto(String email, Long annonceId, Long photoId) {
-        annonceDeProprietaire(email, annonceId);
+        annonceDeProprietaireVerrouillee(email, annonceId);
         Photo photo = photoRepository.findById(photoId)
                 .filter(p -> p.getAnnonce().getId().equals(annonceId))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Photo introuvable"));
@@ -371,6 +360,17 @@ public class AnnonceService {
     private Annonce annonceDeProprietaire(String email, Long annonceId) {
         Proprietaire proprietaire = proprietaireService.parEmail(email);
         return annonceRepository.findByIdAndProprietaireId(annonceId, proprietaire.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN,
+                        "Annonce non attribuee a ce proprietaire"));
+    }
+
+    /**
+     * Verrouille la ligne de l'annonce jusqu'a la fin de la transaction pour
+     * serialiser toutes les mutations de ses photos entre instances applicatives.
+     */
+    private Annonce annonceDeProprietaireVerrouillee(String email, Long annonceId) {
+        Proprietaire proprietaire = proprietaireService.parEmail(email);
+        return annonceRepository.findLockedByIdAndProprietaireId(annonceId, proprietaire.getId())
                 .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN,
                         "Annonce non attribuee a ce proprietaire"));
     }
