@@ -122,6 +122,26 @@ class AuthControllerTest {
     }
 
     @Test
+    void sixiemeEchecDeConnexionRepond429() throws Exception {
+        String email = emailUnique();
+        inscrireEtRecupererToken(email, "MotDePasse123", Role.LOCATAIRE);
+        LoginRequest mauvaisMotDePasse = new LoginRequest(email, "MauvaisMotDePasse");
+
+        // Les cinq premiers echecs sont authentifies comme des erreurs de credentials.
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/auth/connexion")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(mauvaisMotDePasse)))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/auth/connexion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(mauvaisMotDePasse)))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     void meSansJetonRepond401() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized());
