@@ -54,30 +54,38 @@ mvn -pl tady-trano-client javafx:run
 
 Le schéma est créé par Flyway (`V1__init.sql`), puis les données initiales sont insérées (`V2__donnees_initiales.sql`).
 
-**1. Définir les variables d'environnement.** `DB_PASSWORD` est obligatoire : l'API refuse de démarrer sans elle.
+**1. Définir les variables d'environnement.** Hors profils `local` et `test`, les quatre variables `DB_URL`, `DB_USER`, `DB_PASSWORD` et `JWT_SECRET` sont obligatoires. L'API refuse une URL JDBC absente/invalide, une connexion TLS explicitement désactivée ou une configuration incomplète ; elle ne retombe pas sur localhost ni sur l'utilisateur `root`.
 
 | Variable | Rôle | Défaut |
 |---|---|---|
-| `DB_PASSWORD` | Mot de passe de la base | **obligatoire, aucun fallback** |
-| `DB_USER` | Utilisateur de la base | `root` |
-| `DB_URL` | URL JDBC | `jdbc:mysql://localhost:3306/tady_trano?createDatabaseIfNotExist=true&useSSL=true&...` |
-| `JWT_SECRET` | Secret de signature des jetons | **obligatoire, aucun fallback** |
+| `DB_URL` | URL JDBC MySQL/MariaDB avec TLS activé | **obligatoire, aucun fallback** |
+| `DB_USER` | Compte SQL dédié à l'application | **obligatoire, aucun fallback** |
+| `DB_PASSWORD` | Mot de passe du compte SQL | **obligatoire, aucun fallback** |
+| `JWT_SECRET` | Secret de signature JWT d'au moins 32 caractères | **obligatoire, aucun fallback** |
 | `JWT_EXPIRATION_MS` | Durée de vie des jetons | `86400000` (24 h) |
 | `SERVER_PORT` | Port de l'API | `8081` |
 
 Exemple sous Windows (PowerShell) :
 
 ```powershell
-$env:DB_PASSWORD = "votre_mot_de_passe"
+$env:DB_URL = "jdbc:mysql://localhost:3306/tady_trano?sslMode=REQUIRED&serverTimezone=Indian/Antananarivo&characterEncoding=utf8"
+$env:DB_USER = "tady_app"
+$env:DB_PASSWORD = "remplacer_par_un_mot_de_passe_long"
+$env:JWT_SECRET = "remplacer_par_un_secret_aleatoire_d_au_moins_32_caracteres"
 mvn -pl tady-trano-api spring-boot:run
 ```
 
 Exemple sous Linux ou macOS :
 
 ```bash
-export DB_PASSWORD="votre_mot_de_passe"
+export DB_URL="jdbc:mysql://localhost:3306/tady_trano?sslMode=REQUIRED&serverTimezone=Indian/Antananarivo&characterEncoding=utf8"
+export DB_USER="tady_app"
+export DB_PASSWORD="remplacer_par_un_mot_de_passe_long"
+export JWT_SECRET="remplacer_par_un_secret_aleatoire_d_au_moins_32_caracteres"
 mvn -pl tady-trano-api spring-boot:run
 ```
+
+Le profil `local` continue d'utiliser sa base H2 en mémoire ; les variables ci-dessus concernent le démarrage persistant hors profils `local`/`test`.
 
 **2. Lancer le client** comme dans le démarrage rapide.
 
