@@ -8,7 +8,7 @@
 /* ---------- Base ---------- */  
 .root {
     -fx-font-family: "Segoe UI", "Inter", "Roboto", "Helvetica Neue", sans-serif;
-    -fx-font-size: 13px;
+    -fx-font-size: 14px;
     -fx-background-color: -color-bg-default;
 }
 
@@ -118,7 +118,7 @@
     -fx-border-radius: 999;  
     -fx-background-radius: 999;  
     -fx-padding: 5 14;  
-    -fx-font-size: 12px;  
+    -fx-font-size: 13px;  
     -fx-font-weight: 600;  
     -fx-text-fill: -color-fg-muted;  
 }  
@@ -324,7 +324,7 @@
 }  
   
 .card-specs {  
-    -fx-font-size: 11px;  
+    -fx-font-size: 12px;  
     -fx-text-fill: -color-fg-muted;  
 }  
   
@@ -350,7 +350,7 @@
 .card-type-badge {  
     -fx-background-radius: 6;  
     -fx-padding: 3 8;  
-    -fx-font-size: 10px;  
+    -fx-font-size: 12px;  
     -fx-font-weight: bold;  
 }  
   
@@ -524,3 +524,179 @@
     -fx-padding: 10 18;  
     -fx-font-weight: 600;  
 }  
+
+/* ---------- Correctifs accessibilite et lisibilite ---------- */
+.root.theme-dark .muted,
+.root.theme-dark .empty-message,
+.root.theme-dark .user-pill,
+.root.theme-dark .range-value,
+.root.theme-dark .pagination-label,
+.root.theme-dark .card-location,
+.root.theme-dark .card-specs,
+.root.theme-dark .badge-info,
+.root.theme-dark .champ-icone-glyphe {
+    -fx-text-fill: #d5dbe5;
+}
+
+.root.theme-light .muted,
+.root.theme-light .empty-message,
+.root.theme-light .user-pill,
+.root.theme-light .range-value,
+.root.theme-light .pagination-label,
+.root.theme-light .card-location,
+.root.theme-light .card-specs,
+.root.theme-light .badge-info,
+.root.theme-light .champ-icone-glyphe {
+    -fx-text-fill: #4b5563;
+}
+
+.root .nav-button:focused,
+.root Button:focused,
+.root TextField:focused,
+.root PasswordField:focused,
+.root ComboBox:focused,
+.root ToggleButton:focused {
+    -fx-border-color: -color-accent-emphasis;
+    -fx-border-width: 1.5px;
+    -fx-border-insets: -1px;
+}
+
+.auth-screen {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 28px;
+    -fx-alignment: center;
+}
+
+.auth-layout {
+    -fx-alignment: center;
+    -fx-spacing: 26px;
+    -fx-max-width: 960px;
+}
+
+.auth-hero {
+    -fx-background-color: -color-accent-emphasis;
+    -fx-background-radius: 20px;
+    -fx-padding: 36px;
+    -fx-spacing: 18px;
+    -fx-pref-width: 410px;
+    -fx-max-width: 410px;
+    -fx-min-height: 480px;
+    -fx-alignment: center-left;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 24, 0, 0, 8);
+}
+
+.auth-eyebrow {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.auth-hero-title {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 30px;
+    -fx-font-weight: bold;
+}
+
+.auth-hero-copy,
+.auth-hero-feature {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 14px;
+}
+
+.auth-hero-feature {
+    -fx-padding: 0 0 0 2px;
+}
+
+.auth-form {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 20px;
+    -fx-border-color: -color-border-muted;
+    -fx-border-radius: 20px;
+    -fx-padding: 30px;
+    -fx-spacing: 14px;
+    -fx-pref-width: 430px;
+    -fx-max-width: 430px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.10), 24, 0, 0, 6);
+}
+
+.auth-form-heading {
+    -fx-font-size: 25px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-fg-default;
+}
+
+.auth-form-copy {
+    -fx-font-size: 14px;
+    -fx-text-fill: -color-fg-default;
+}
+
+.auth-mode-bar {
+    -fx-background-color: -color-bg-default;
+    -fx-background-radius: 10px;
+    -fx-padding: 6px;
+    -fx-spacing: 8px;
+}
+
+.auth-mode-bar .radio-button {
+    -fx-padding: 8px 12px;
+    -fx-font-size: 14px;
+}
+
+.auth-form .text-field,
+.auth-form .password-field {
+    -fx-pref-height: 42px;
+    -fx-font-size: 14px;
+    -fx-background-radius: 8px;
+}
+
+.auth-field-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-fg-default;
+}
+
+.auth-help-button {
+    -fx-background-color: transparent;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-text-fill: -color-fg-default;
+    -fx-padding: 9px 14px;
+    -fx-cursor: hand;
+}
+
+.auth-help-button:hover {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-accent-emphasis;
+}
+
+.auth-form .btn-primary-custom {
+    -fx-pref-height: 44px;
+    -fx-font-size: 14px;
+}
+
+.auth-screen .error-text {
+    -fx-font-size: 13px;
+}
+
+.annonce-card {
+    -fx-cursor: hand;
+}
+
+.card-title {
+    -fx-font-size: 15px;
+    -fx-text-fill: -color-fg-default;
+}
+
+.card-specs,
+.card-location {
+    -fx-font-size: 13px;
+}
+
+.badge-info {
+    -fx-font-size: 12px;
+}
+
+.filter-field {
+    -fx-pref-height: 40px;
+}
