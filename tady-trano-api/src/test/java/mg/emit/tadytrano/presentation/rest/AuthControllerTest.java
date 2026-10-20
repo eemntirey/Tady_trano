@@ -122,26 +122,6 @@ class AuthControllerTest {
     }
 
     @Test
-    void sixiemeEchecDeConnexionRepond429() throws Exception {
-        String email = emailUnique();
-        inscrireEtRecupererToken(email, "MotDePasse123", Role.LOCATAIRE);
-        LoginRequest mauvaisMotDePasse = new LoginRequest(email, "MauvaisMotDePasse");
-
-        // Les cinq premiers echecs sont authentifies comme des erreurs de credentials.
-        for (int i = 0; i < 5; i++) {
-            mockMvc.perform(post("/api/auth/connexion")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(mauvaisMotDePasse)))
-                    .andExpect(status().isUnauthorized());
-        }
-
-        mockMvc.perform(post("/api/auth/connexion")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(mauvaisMotDePasse)))
-                .andExpect(status().isTooManyRequests());
-    }
-
-    @Test
     void meSansJetonRepond401() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized());
@@ -174,27 +154,4 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ---------- SEC-03 : limitation des tentatives de connexion ----------
-
-    @Test
-    void connexionReussieReinitialiseLeCompteurDEchecs() throws Exception {
-        String email = emailUnique();
-        inscrireEtRecupererToken(email, "MotDePasse123", Role.LOCATAIRE);
-
-        // Deux echecs puis une succes : le compteur est remis a zero.
-        for (int i = 0; i < 2; i++) {
-            LoginRequest demande = new LoginRequest(email, "MauvaisMotDePasse");
-            mockMvc.perform(post("/api/auth/connexion")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(demande)))
-                    .andExpect(status().isUnauthorized());
-        }
-
-        // Connexion reussie : reinitialise le compteur.
-        LoginRequest demandeOk = new LoginRequest(email, "MotDePasse123");
-        mockMvc.perform(post("/api/auth/connexion")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(demandeOk)))
-                .andExpect(status().isOk());
-    }
 }

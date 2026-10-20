@@ -170,6 +170,6 @@ Projet destiné à un usage local. Avant toute mise en production, il faudrait :
 
 - activer HTTPS (API et base de données) et définir un `JWT_SECRET` propre (aucune valeur par défaut n'est fournie dans le dépôt) ;
 - les comptes de démonstration de la migration V2 sont désactivés par la migration V4 (corrective) ;
-- la limitation des tentatives de connexion est active (blocage temporaire après 5 échecs) ;
+- ajouter et tester une limitation des tentatives de connexion avant toute exposition à des utilisateurs non fiables ;
 - remplacer l'ajout de photos par URL par un téléversement avec contrôle du type et de la taille ;
 - ajouter un pré-filtre géographique pour le tri par distance si le nombre d'annonces devient important.
