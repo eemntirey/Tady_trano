@@ -92,6 +92,8 @@ public final class Affichage {
         vue.setFitWidth(largeur);
         vue.setFitHeight(hauteur);
         vue.setPreserveRatio(true);
+        vue.setSmooth(true);
+        vue.setCache(true);
 
         long generation = GENERATIONS.incrementAndGet();
         vue.getProperties().put(CLE_GENERATION, generation);
