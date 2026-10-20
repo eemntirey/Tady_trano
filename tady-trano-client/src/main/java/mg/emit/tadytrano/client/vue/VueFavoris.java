@@ -149,7 +149,7 @@ public class VueFavoris extends VBox {
         ImageView image = Affichage.vignette(a.urlPhotoPrincipale(), 236, 140);
         if (!louee) {
             image.getStyleClass().add("thumb-clickable");
-            image.setOnMouseClicked(e -> app.ouvrirDetail(a.id(), () -> { app.ouvrir(this); charger(); }));
+            image.setOnMouseClicked(e -> app.ouvrirDetail(a.id(), () -> { app.afficherSansHistorique(this); charger(); }));
         }
 
         Label titre = new Label(a.titre());
@@ -175,7 +175,7 @@ public class VueFavoris extends VBox {
         if (louee) {
             detailBtn.setTooltip(new javafx.scene.control.Tooltip("Cette annonce est louée et n'est plus disponible."));
         } else {
-            detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), () -> { app.ouvrir(this); charger(); }));
+            detailBtn.setOnAction(e -> app.ouvrirDetail(a.id(), () -> { app.afficherSansHistorique(this); charger(); }));
         }
 
         Button retirerBtn = new Button("Retirer");
