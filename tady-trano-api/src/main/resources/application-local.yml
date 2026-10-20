@@ -18,3 +18,8 @@ spring:
         format_sql: true
   flyway:
     enabled: false
+
+# Secret de développement local uniquement — NE JAMAIS réutiliser hors profil local.
+jwt:
+  secret: ${JWT_SECRET:local-only-tady-trano-secret-32bytes-minimum}
+  expiration-ms: 3600000
