@@ -72,6 +72,17 @@ class ConfigurationSecuriteTest {
         }
     }
 
+    @Test
+    void melangerLocalEtProductionNeContournePasLesGardes() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("local", "production");
+
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class, () -> valider(environment));
+
+        assertTrue(erreur.getMessage().contains("DB_URL"), erreur.getMessage());
+    }
+
     private MockEnvironment environnementValide() {
         MockEnvironment environment = new MockEnvironment();
         environment.setProperty("DB_URL",
