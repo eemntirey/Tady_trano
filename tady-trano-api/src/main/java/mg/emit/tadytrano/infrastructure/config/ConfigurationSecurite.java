@@ -6,18 +6,20 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
 
+import java.net.URI;
+import java.util.Locale;
+
 /**
  * Valide la configuration de securite au demarrage de l'application.
  *
  * Ce composant est active uniquement hors profils {@code local} et
  * {@code test}. Il refuse le demarrage si :
  * <ul>
- *   <li>{@code DB_PASSWORD} est absente, vide ou egale a la valeur par defaut
- *       dangereuse {@code rootpass} ;</li>
- *   <li>{@code JWT_SECRET} est absent, vide ou trop court (moins de 32
- *       caracteres) ;</li>
- *   <li>l'URL JDBC desactive SSL ({@code useSSL=false}) ou autorise la
- *       recuperation de cle publique ({@code allowPublicKeyRetrieval=true}).</li>
+ *   <li>{@code DB_URL}, {@code DB_USER} ou {@code DB_PASSWORD} sont absentes
+ *       ou vides ;</li>
+ *   <li>l'URL n'est pas une URL MySQL/MariaDB complete ou desactive TLS ;</li>
+ *   <li>{@code JWT_SECRET} est absent, vide, trop court ou correspond au
+ *       secret de developpement inclus dans le depot.</li>
  * </ul>
  *
  * L'objectif est d'empecher le demarrage d'une instance exposee sur un
@@ -45,9 +47,10 @@ public class ConfigurationSecurite implements ApplicationRunner {
             return; // Aucune restriction pour les profils locaux et de tests.
         }
 
+        validerUrlBaseDonnees();
+        validerUtilisateurBase();
         validerMotDePasseBase();
         validerSecretJwt();
-        validerUrlBaseDonnees();
     }
 
     private void validerMotDePasseBase() {
@@ -87,19 +90,48 @@ public class ConfigurationSecurite implements ApplicationRunner {
         }
     }
 
+    private void validerUtilisateurBase() {
+        obligatoire("DB_USER");
+    }
+
     private void validerUrlBaseDonnees() {
-        String url = environment.getProperty("DB_URL");
-        if (StringUtils.hasText(url)) {
-            if (url.contains("useSSL=false")) {
-                throw new IllegalStateException(
-                        "SECURITE : l'URL de la base de donnees doit activer SSL (useSSL=true). "
-                                + "Supprimez useSSL=false de DB_URL.");
-            }
-            if (url.contains("allowPublicKeyRetrieval=true")) {
-                throw new IllegalStateException(
-                        "SECURITE : allowPublicKeyRetrieval=true est interdit. "
-                                + "Supprimez ce parametre de DB_URL et configurez correctement le certificat SSL.");
-            }
+        String url = obligatoire("DB_URL").trim();
+        if (!url.startsWith("jdbc:mysql://") && !url.startsWith("jdbc:mariadb://")) {
+            throw new IllegalStateException(
+                    "SECURITE : DB_URL doit etre une URL JDBC MySQL ou MariaDB complete.");
         }
+
+        final URI uri;
+        try {
+            // URI attend "mysql://..." ou "mariadb://...", sans le prefixe JDBC.
+            uri = URI.create(url.substring("jdbc:".length()));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("SECURITE : DB_URL est mal formee.", e);
+        }
+        if (!StringUtils.hasText(uri.getHost()) || uri.getPath() == null
+                || uri.getPath().length() <= 1 || !StringUtils.hasText(uri.getPath().substring(1))) {
+            throw new IllegalStateException(
+                    "SECURITE : DB_URL doit preciser un hote et une base de donnees.");
+        }
+
+        String normalisee = url.toLowerCase(Locale.ROOT);
+        if (normalisee.contains("usessl=false") || normalisee.contains("sslmode=disabled")) {
+            throw new IllegalStateException(
+                    "SECURITE : l'URL de la base de donnees ne doit pas desactiver TLS.");
+        }
+        if (normalisee.contains("allowpublickeyretrieval=true")) {
+            throw new IllegalStateException(
+                    "SECURITE : allowPublicKeyRetrieval=true est interdit. "
+                            + "Configurez correctement le chiffrement et les certificats TLS.");
+        }
+    }
+
+    private String obligatoire(String nom) {
+        String valeur = environment.getProperty(nom);
+        if (!StringUtils.hasText(valeur)) {
+            throw new IllegalStateException(
+                    "SECURITE : la variable " + nom + " est obligatoire hors des profils local/test.");
+        }
+        return valeur;
     }
 }
