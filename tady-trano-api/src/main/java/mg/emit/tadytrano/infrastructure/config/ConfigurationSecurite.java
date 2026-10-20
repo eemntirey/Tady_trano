@@ -41,8 +41,9 @@ public class ConfigurationSecurite implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         String[] profilsActifs = environment.getActiveProfiles();
-        boolean estLocalOuTest = java.util.Arrays.stream(profilsActifs)
-                .anyMatch(p -> "local".equals(p) || "test".equals(p));
+        boolean estLocalOuTest = profilsActifs.length > 0
+                && java.util.Arrays.stream(profilsActifs)
+                        .allMatch(p -> "local".equals(p) || "test".equals(p));
         if (estLocalOuTest) {
             return; // Aucune restriction pour les profils locaux et de tests.
         }
