@@ -61,7 +61,7 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Start API against MySQL and verify Flyway V4 and security data
+      - name: Start API against MySQL and verify Flyway V1-V5 and security data
         env:
           DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&sslMode=REQUIRED&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
           DB_USER: root
@@ -125,4 +125,4 @@ jobs:
             exit 1
           fi
 
-          echo "MySQL/Flyway V5 and demo-data security checks passed."
+          echo "MySQL/Flyway V1-V5 and demo-data security checks passed."

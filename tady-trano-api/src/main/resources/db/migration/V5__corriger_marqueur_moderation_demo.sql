@@ -1,8 +1,7 @@
--- Correct the moderation marker for the demo listing hidden by V4.
--- V3 ran before V4 changed this listing from ACTIVE to MASQUEE, so V3 could
--- not mark it. Add a new migration rather than modifying an applied migration.
+-- V4 masque l'annonce de démonstration, mais ne marque pas toujours
+-- explicitement le verrou de modération. Corriger les deux propriétés ensemble.
+-- Nouvelle migration : ne jamais modifier V3/V4 déjà appliquées.
 UPDATE annonce
-SET masquee_par_admin = TRUE
-WHERE titre = 'Offre suspecte prix derisoire pour test moderation'
-  AND statut = 'MASQUEE'
-  AND masquee_par_admin = FALSE;
+SET statut = 'MASQUEE',
+    masquee_par_admin = TRUE
+WHERE titre = 'Offre suspecte prix dérisoire pour test modération';
