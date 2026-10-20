@@ -303,12 +303,27 @@ public class VueRecherche extends VBox {
     // Referentiel (villes, quartiers, types) : champ, listes et pastilles
     // ------------------------------------------------------------------
 
+    private static volatile Referentiel referentielCache;
+
     private record Referentiel(List<VilleResponse> villes,
                                List<TypeLocationResponse> types,
                                List<QuartierResponse> quartiers) {
+        private Referentiel {
+            villes = List.copyOf(villes);
+            types = List.copyOf(types);
+            quartiers = List.copyOf(quartiers);
+        }
     }
 
     private void chargerReferentiel() {
+        // Les villes, quartiers et types changent rarement : eviter de refaire
+        // toutes les requetes REST a chaque retour sur l'ecran de recherche.
+        Referentiel cache = referentielCache;
+        if (cache != null) {
+            appliquerReferentiel(cache);
+            return;
+        }
+
         app.appeler(() -> {
             List<VilleResponse> villes = api.villes();
             List<TypeLocationResponse> types = api.typesLocation();
@@ -317,7 +332,10 @@ public class VueRecherche extends VBox {
                 quartiers.addAll(api.quartiers(ville.id()));
             }
             return new Referentiel(villes, types, quartiers);
-        }, this::appliquerReferentiel, app::gererErreur);
+        }, referentiel -> {
+            referentielCache = referentiel;
+            appliquerReferentiel(referentiel);
+        }, app::gererErreur);
     }
 
     private void appliquerReferentiel(Referentiel referentiel) {
