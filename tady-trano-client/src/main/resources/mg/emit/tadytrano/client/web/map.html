@@ -113,6 +113,51 @@
         .popup-btn:hover {
             background: #1d4ed8;
         }
+
+        /* --- Theme sombre (classe appliquee par setMapTheme) --- */
+        body.dark .leaflet-popup-content-wrapper {
+            background: #161b22;
+            color: #e6edf3;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55);
+        }
+        body.dark .leaflet-popup-tip {
+            background: #161b22;
+        }
+        body.dark .popup-img {
+            background-color: #21262d;
+        }
+        body.dark .popup-type {
+            color: #6ea8fe;
+        }
+        body.dark .popup-title {
+            color: #e6edf3;
+        }
+        body.dark .popup-price {
+            color: #ffffff;
+        }
+        body.dark .leaflet-control-attribution {
+            background: rgba(22, 27, 34, 0.85);
+            color: #8b949e;
+        }
+        body.dark .leaflet-control-attribution a {
+            color: #6ea8fe;
+        }
+        body.dark .leaflet-bar a {
+            background: #21262d;
+            color: #e6edf3;
+            border-bottom-color: #30363d;
+        }
+        body.dark .leaflet-bar a:hover {
+            background: #30363d;
+        }
+        body.dark .leaflet-bar a.leaflet-disabled {
+            background: #161b22;
+            color: #484f58;
+        }
+        /* Filtre applique uniquement aux tuiles OSM (marqueurs/popups intacts). */
+        body.dark .leaflet-tile-pane {
+            filter: invert(1) hue-rotate(180deg) brightness(0.92) saturate(0.9);
+        }
     </style>
 </head>
 <body>
@@ -123,6 +168,10 @@
         var map;
         var markersLayer;
         var userMarker = null;
+        var tileLayer = null;
+        var mapSombre = false;
+
+        var TUILES_OSM = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
         function initMap(lat, lng, zoom) {
             lat = lat || -21.4536; // Defaut : Fianarantsoa
@@ -134,7 +183,7 @@
                 attributionControl: true
             }).setView([lat, lng], zoom);
 
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            tileLayer = L.tileLayer(TUILES_OSM, {
                 maxZoom: 19,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             }).addTo(map);
@@ -146,6 +195,16 @@
                     window.javaBridge.onMapClick(e.latlng.lat, e.latlng.lng);
                 }
             });
+        }
+
+        /** Bascule clair/sombre : CSS popups + filtre invert des tuiles OSM. Appele depuis Java. */
+        function setMapTheme(sombre) {
+            mapSombre = !!sombre;
+            if (mapSombre) {
+                document.body.classList.add('dark');
+            } else {
+                document.body.classList.remove('dark');
+            }
         }
 
         function formatPrix(prix) {

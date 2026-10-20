@@ -27,6 +27,8 @@ public class CarteView extends StackPane {
     private String labelAttente;
     /** [lat, lng, zoom] si un centrage est demande avant le chargement de la page. */
     private Double[] centrageEnAttente;
+    /** Dernier theme applique en JS (evite d'executer le script pour rien). */
+    private Boolean themeApplique;
 
     public CarteView() {
         getChildren().add(webView);
@@ -41,6 +43,10 @@ public class CarteView extends StackPane {
                 // Le evenement window.load de map.html a pu se declencher AVANT
                 // l'injection du pont : on notifie explicitement que la carte est prete.
                 bridge.onMapReady();
+
+                // Applique le theme courant (clair/sombre) des le chargement.
+                themeApplique = null;
+                appliquerThemeCarte(ThemeManager.instance().estModeSombre());
 
                 if (annoncesEnAttente != null) {
                     afficherAnnonces(annoncesEnAttente);
@@ -60,9 +66,29 @@ public class CarteView extends StackPane {
             }
         });
 
+        // Suit les bascules de l'application : la carte Leaflet doit rester coherente.
+        ThemeManager.instance().ajouterEcouteur(sombre -> {
+            if (pageChargee) {
+                appliquerThemeCarte(sombre);
+            }
+        });
+
         URL mapUrl = getClass().getResource("/mg/emit/tadytrano/client/web/map.html");
         if (mapUrl != null) {
             webEngine.load(mapUrl.toExternalForm());
+        }
+    }
+
+    /** Pousse le theme dans map.html (tuiles + CSS popups). */
+    private void appliquerThemeCarte(boolean sombre) {
+        if (Boolean.valueOf(sombre).equals(themeApplique)) {
+            return;
+        }
+        themeApplique = sombre;
+        try {
+            webEngine.executeScript("setMapTheme(" + (sombre ? "true" : "false") + ");");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

@@ -35,6 +35,9 @@ public class VueFavoris extends VBox {
     private final Button precedent = new Button("<");
     private final Button suivant = new Button(">");
     private final Label messageVide = new Label("Aucun favori pour le moment.");
+    private final HBox pagination = new HBox(10, precedent, pageLabel, suivant);
+    private final Button seConnecter = new Button("Se connecter");
+    private final VBox videNonConnecte = new VBox(12, messageVide, seConnecter);
 
     private int page = 0;
     private int totalPages = 0;
@@ -52,15 +55,25 @@ public class VueFavoris extends VBox {
         setSpacing(15);
         setPadding(new Insets(20));
 
-        Label titre = new Label("Mes Annonces Favorites");
+        Label titre = new Label("Mes annonces favorites");
         titre.setFont(Font.font("System", FontWeight.BOLD, 22));
 
         conteneurCards.setHgap(15);
         conteneurCards.setVgap(15);
 
         messageVide.getStyleClass().add("empty-message");
+        seConnecter.getStyleClass().add("btn-primary-custom");
+        seConnecter.setOnAction(e -> app.ouvrir(new VueConnexion(app, api)));
+        videNonConnecte.setAlignment(Pos.CENTER);
+        videNonConnecte.setPadding(new Insets(30, 0, 0, 0));
+        videNonConnecte.setMaxWidth(Double.MAX_VALUE);
 
-        // Pagination
+        // Pagination : masquee tant qu'il n'y a pas au moins une page de favoris.
+        pagination.setAlignment(Pos.CENTER);
+        pagination.setPadding(new Insets(10));
+        pagination.setVisible(false);
+        pagination.setManaged(false);
+
         precedent.setOnAction(e -> {
             if (page > 0) {
                 page--;
@@ -74,24 +87,27 @@ public class VueFavoris extends VBox {
             }
         });
 
-        HBox pagination = new HBox(10, precedent, pageLabel, suivant);
-        pagination.setAlignment(Pos.CENTER);
-        pagination.setPadding(new Insets(10));
+        getChildren().addAll(titre, new Separator(), videNonConnecte, conteneurCards, pagination);
+    }
 
-        getChildren().addAll(titre, new Separator(), messageVide, conteneurCards, pagination);
+    private void afficherPagination(boolean visible) {
+        pagination.setVisible(visible);
+        pagination.setManaged(visible);
     }
 
     private void charger() {
         if (!app.estConnecte()) {
-            messageVide.setText("Veuillez vous connecter pour accéder à vos favoris.");
-            messageVide.setVisible(true);
+            messageVide.setText("Connectez-vous pour retrouver vos annonces favorites.");
+            videNonConnecte.setVisible(true);
+            videNonConnecte.setManaged(true);
             conteneurCards.getChildren().clear();
             pageLabel.setText("");
-            precedent.setDisable(true);
-            suivant.setDisable(true);
+            afficherPagination(false);
             return;
         }
 
+        videNonConnecte.setVisible(false);
+        videNonConnecte.setManaged(false);
         final int pageDemandee = page;
         final int gen = ++generation;
         app.appeler(() -> api.mesFavoris(pageDemandee, TAILLE_PAGE),
@@ -124,14 +140,21 @@ public class VueFavoris extends VBox {
         pageLabel.setText("Page " + (totalPages == 0 ? 0 : page + 1) + " / " + totalPages + " (" + reponse.totalElements() + " favoris)");
         precedent.setDisable(page <= 0);
         suivant.setDisable(page >= totalPages - 1 || totalPages == 0);
+        afficherPagination(totalPages > 1);
 
         if (reponse.contenu().isEmpty()) {
             messageVide.setText("Vous n'avez aucune annonce enregistrée en favoris.");
-            messageVide.setVisible(true);
+            videNonConnecte.setVisible(true);
+            videNonConnecte.setManaged(true);
+            seConnecter.setVisible(false);
+            seConnecter.setManaged(false);
             return;
         }
 
-        messageVide.setVisible(false);
+        seConnecter.setVisible(true);
+        seConnecter.setManaged(true);
+        videNonConnecte.setVisible(false);
+        videNonConnecte.setManaged(false);
         for (FavoriResponse favori : reponse.contenu()) {
             conteneurCards.getChildren().add(creerCarteFavori(favori));
         }

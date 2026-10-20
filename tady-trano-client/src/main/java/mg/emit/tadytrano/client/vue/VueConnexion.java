@@ -16,7 +16,6 @@ import mg.emit.tadytrano.client.TadyTranoApp;
 import mg.emit.tadytrano.client.api.ApiClient;
 import mg.emit.tadytrano.client.dto.LoginRequest;
 import mg.emit.tadytrano.client.dto.RegisterRequest;
-import mg.emit.tadytrano.client.util.Affichage;
 import mg.emit.tadytrano.client.util.Travailleur;
 
 /**
@@ -137,7 +136,9 @@ public class VueConnexion extends VBox {
 
         erreur.getStyleClass().add("error-text");
         erreur.setWrapText(true);
-        erreur.setMinHeight(24);
+        erreur.setMinHeight(0);
+        erreur.setVisible(false);
+        erreur.setManaged(false);
 
         valider.getStyleClass().add("btn-primary-custom");
         valider.setMaxWidth(Double.MAX_VALUE);
@@ -194,23 +195,52 @@ public class VueConnexion extends VBox {
                 ? "Renseignez vos informations pour commencer."
                 : "Connectez-vous pour retrouver vos recherches et vos favoris.");
         valider.setText(pourInscription ? "Créer mon compte" : "Se connecter");
+        effacerErreur();
+    }
+
+    private void afficherMessageErreur(String message) {
+        erreur.setText(message);
+        erreur.setVisible(true);
+        erreur.setManaged(true);
+    }
+
+    private void effacerErreur() {
         erreur.setText("");
+        erreur.setVisible(false);
+        erreur.setManaged(false);
     }
 
     private void envoyer() {
         if (authentificationEnCours) {
             return;
         }
-        erreur.setText("");
+        effacerErreur();
         String adresse = email.getText().trim();
         String secret = motDePasse.getText();
-        if (adresse.isEmpty() || secret.isEmpty()) {
-            erreur.setText("Adresse e-mail et mot de passe obligatoires.");
+        if (adresse.isEmpty()) {
+            afficherMessageErreur("L'adresse e-mail est obligatoire.");
+            email.requestFocus();
+            return;
+        }
+        if (!adresse.contains("@") || adresse.startsWith("@") || adresse.endsWith("@")) {
+            afficherMessageErreur("Saisissez une adresse e-mail valide (ex. nom@domaine.mg).");
+            email.requestFocus();
+            return;
+        }
+        if (secret.isEmpty()) {
+            afficherMessageErreur("Le mot de passe est obligatoire.");
+            motDePasse.requestFocus();
             return;
         }
         if (inscription.isSelected()) {
-            if (nom.getText().isBlank() || prenom.getText().isBlank()) {
-                erreur.setText("Nom et prénom obligatoires.");
+            if (nom.getText().isBlank()) {
+                afficherMessageErreur("Le nom est obligatoire.");
+                nom.requestFocus();
+                return;
+            }
+            if (prenom.getText().isBlank()) {
+                afficherMessageErreur("Le prénom est obligatoire.");
+                prenom.requestFocus();
                 return;
             }
             String roleChoisi = roleProprio.isSelected() ? "PROPRIETAIRE" : "LOCATAIRE";
@@ -249,9 +279,9 @@ public class VueConnexion extends VBox {
     }
 
     private void afficherErreur(Exception e) {
-        erreur.setText(e.getMessage() == null || e.getMessage().isBlank()
+        // Message inline uniquement : une modale en plus serait redondante.
+        afficherMessageErreur(e.getMessage() == null || e.getMessage().isBlank()
                 ? "Impossible de terminer l'authentification." : e.getMessage());
         terminerAuthentification();
-        Affichage.erreur(e);
     }
 }

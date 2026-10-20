@@ -180,7 +180,7 @@ public class VueRecherche extends VBox {
             page = 0;
             rechercher();
         });
-        Button reinitialiser = new Button("Reinitialiser");
+        Button reinitialiser = new Button("Réinitialiser");
         reinitialiser.getStyleClass().add("btn-ghost");
         reinitialiser.setOnAction(e -> reinitialiser());
         HBox actions = new HBox(10, reinitialiser, lancer);
@@ -367,7 +367,7 @@ public class VueRecherche extends VBox {
         pastillesQuartier.clear();
 
         for (TypeLocationResponse t : types) {
-            ToggleButton pastille = new ToggleButton(t.libelle());
+            ToggleButton pastille = new ToggleButton(Affichage.libelleType(t.libelle()));
             pastille.getStyleClass().add("chip");
             pastille.setOnAction(e -> {
                 if (pastille.isSelected()) {
@@ -630,15 +630,15 @@ public class VueRecherche extends VBox {
         Label quartierLabel = new Label(lieu);
         quartierLabel.getStyleClass().add("card-location");
 
-        Label details = new Label(annonce.nbPieces() + " pieces"
-                + (annonce.surface() != null ? " - " + annonce.surface() + " m2" : ""));
+        Label details = new Label(Affichage.pieces(annonce.nbPieces())
+                + (annonce.surface() != null ? " · " + annonce.surface() + " m²" : ""));
         details.getStyleClass().add("card-specs");
 
         corps.getChildren().addAll(titre, prixLabel, quartierLabel, details);
 
         HBox badges = new HBox(6);
         if (annonce.typeLocation() != null) {
-            Label typeBadge = new Label(annonce.typeLocation().libelle());
+            Label typeBadge = new Label(Affichage.libelleType(annonce.typeLocation().libelle()));
             typeBadge.getStyleClass().add("badge-info");
             badges.getChildren().add(typeBadge);
         }

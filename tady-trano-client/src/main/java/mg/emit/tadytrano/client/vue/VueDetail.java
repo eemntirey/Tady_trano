@@ -7,6 +7,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -27,7 +28,6 @@ public class VueDetail extends VBox {
     private final Runnable retour;
     private final Button favori = new Button("Ajouter aux favoris");
     private final ImageView principale = new ImageView();
-    private final Button retourBtn = new Button("< Retour");
 
     public VueDetail(TadyTranoApp app, ApiClient api, long annonceId, Runnable retour) {
         this.app = app;
@@ -37,22 +37,11 @@ public class VueDetail extends VBox {
         setSpacing(10);
         setPadding(new Insets(15));
 
-        Button boutonRetour = retourBtn;
-        boutonRetour.getStyleClass().add("btn-ghost");
-        boutonRetour.setOnAction(e -> {
-            if (retour != null) {
-                retour.run();
-            } else {
-                app.retour();
-            }
-        });
-        getChildren().add(boutonRetour);
-
         app.appeler(() -> api.detail(annonceId), this::afficher);
     }
 
     private void afficher(AnnonceDetailResponse annonce) {
-        getChildren().removeIf(n -> n != retourBtn);
+        getChildren().clear();
 
         principale.setFitWidth(640);
         principale.setFitHeight(380);
@@ -76,39 +65,49 @@ public class VueDetail extends VBox {
         Label prix = new Label(Affichage.prix(annonce.prix()));
         prix.getStyleClass().add("detail-price");
 
-        Label caract = new Label(annonce.nbPieces() + " pieces"
-                + (annonce.surface() != null ? " - " + annonce.surface() + " m2" : "")
-                + " - " + annonce.typeLocation().libelle()
-                + " - " + annonce.quartier()
-                + "   [statut : " + annonce.statut() + "]");
+        String metadonnees = Affichage.pieces(annonce.nbPieces())
+                + (annonce.surface() != null ? " · " + annonce.surface() + " m²" : "")
+                + " · " + Affichage.libelleType(annonce.typeLocation() == null ? "" : annonce.typeLocation().libelle())
+                + " · " + annonce.quartier();
+        Label caract = new Label(metadonnees);
         caract.getStyleClass().add("muted");
+        caract.setWrapText(true);
+
+        Label statut = new Label("Statut : " + annonce.statut());
+        statut.getStyleClass().add("muted");
 
         Label description = new Label(annonce.description() == null ? "" : annonce.description());
         description.setWrapText(true);
         description.setMaxWidth(640);
 
-        VBox contact = new VBox(4);
+        VBox contact = new VBox(8);
         contact.setPadding(new Insets(10));
         contact.getStyleClass().add(annonce.contact() != null ? "contact-card" : "contact-card-locked");
         if (annonce.contact() != null) {
             Label nom = new Label("Contact : " + annonce.contact().nom());
             nom.setFont(Font.font("System", FontWeight.BOLD, 14));
-            Label tel = new Label("Tel : " + annonce.contact().telephone());
+            Label tel = new Label("Tél. : " + annonce.contact().telephone());
             Label mail = new Label(annonce.contact().emailContact() == null
                     ? "" : "Email : " + annonce.contact().emailContact());
             contact.getChildren().addAll(nom, tel, mail);
         } else {
-            contact.getChildren().add(new Label(
-                    "Connectez-vous pour voir les coordonnees du proprietaire."));
+            Label verrou = new Label("Connectez-vous pour voir les coordonnées du propriétaire.");
+            verrou.setWrapText(true);
+            Button ouvrirConnexion = new Button("Se connecter");
+            ouvrirConnexion.getStyleClass().add("btn-primary-custom");
+            ouvrirConnexion.setOnAction(e -> app.ouvrir(new VueConnexion(app, api)));
+            contact.getChildren().addAll(verrou, ouvrirConnexion);
         }
 
         favori.setOnAction(e -> basculerFavori(annonce));
         HBox actions = new HBox(15, favori);
         actions.setAlignment(Pos.CENTER_LEFT);
 
-        VBox colonne = new VBox(10, titre, prix, caract, new Separator(),
+        VBox colonne = new VBox(10, titre, prix, caract, statut, new Separator(),
                 description, contact, actions);
+        colonne.setFillWidth(true);
         HBox contenu = new HBox(25, principale, colonne);
+        HBox.setHgrow(colonne, Priority.ALWAYS);
 
         getChildren().addAll(contenu, vignettes);
         majLibelleFavori();
@@ -128,7 +127,7 @@ public class VueDetail extends VBox {
 
     private void basculerFavori(AnnonceDetailResponse annonce) {
         if (!app.estConnecte()) {
-            Affichage.erreur(new RuntimeException("Connectez-vous pour utiliser les favoris"));
+            app.ouvrir(new VueConnexion(app, api));
             return;
         }
         boolean ajoute = "Ajouter aux favoris".equals(favori.getText());
@@ -151,8 +150,7 @@ public class VueDetail extends VBox {
 
     private void majLibelleFavori() {
         if (!app.estConnecte()) {
-            // Le bouton reste actionnable pour expliquer la restriction au clic.
-            favori.setText("Connexion requise pour les favoris");
+            favori.setText("Se connecter pour gérer les favoris");
             favori.setDisable(false);
             return;
         }

@@ -43,7 +43,8 @@ public class TadyTranoApp extends Application {
     private ApiClient api;
     private BorderPane racine;
     private Label utilisateur = new Label();
-    private final ThemeManager themeManager = new ThemeManager();
+    /** Theme global partage avec la carte WebView (suivi des bascules clair/sombre). */
+    private final ThemeManager themeManager = ThemeManager.instance();
     private final java.util.List<Button> boutonsNav = new java.util.ArrayList<>();
     private final Deque<Node> historiqueVues = new ArrayDeque<>();
     private final BooleanProperty retourDisponible = new SimpleBooleanProperty(false);
@@ -111,7 +112,7 @@ public class TadyTranoApp extends Application {
         connexion.setOnAction(e -> ouvrir(new VueConnexion(this, api)));
         connexion.visibleProperty().bind(session.connecteProperty().not());
         connexion.managedProperty().bind(connexion.visibleProperty());
-        connexion.getStyleClass().addAll("nav-button", "nav-button-danger");
+        connexion.getStyleClass().add("nav-button");
 
         Button admin = new Button("Moderation");
         admin.setOnAction(e -> ouvrir(new VueAdmin(this, api)));

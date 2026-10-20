@@ -76,6 +76,27 @@ public final class Affichage {
         return km == null ? null : String.format("%.1f km", km);
     }
 
+    /** Libelle de type d'location avec accents francais (API sans accents). */
+    public static String libelleType(String brut) {
+        if (brut == null || brut.isBlank()) {
+            return "";
+        }
+        return switch (brut.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "etage" -> "Étage";
+            case "hotel" -> "Hôtel";
+            case "par piece", "par pièce" -> "Par pièce";
+            default -> brut.trim();
+        };
+    }
+
+    /** Nombre de pieces avec accord singulier/pluriel et accent. */
+    public static String pieces(Integer nb) {
+        if (nb == null) {
+            return "";
+        }
+        return nb + (nb > 1 ? " pièces" : " pièce");
+    }
+
     /** Vignette d'image distante. Le placeholder reste visible pendant le chargement
      * et remplace l'image en cas d'echec. */
     public static ImageView vignette(String url, double largeur, double hauteur) {
