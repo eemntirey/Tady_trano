@@ -114,5 +114,18 @@ public final class ConfigurationSecurite
                     "SECURITE : allowPublicKeyRetrieval=true est interdit. "
                             + "Configurez correctement le certificat SSL et supprimez ce parametre de DB_URL.");
         }
+
+        if (normalisee.startsWith("jdbc:mysql:")) {
+            String sslMode = Arrays.stream(normalisee.split("[?&]"))
+                    .filter(parametre -> parametre.startsWith("sslmode="))
+                    .map(parametre -> parametre.substring("sslmode=".length()))
+                    .findFirst()
+                    .orElse("");
+            if (!Arrays.asList("required", "verify_ca", "verify_identity").contains(sslMode)) {
+                throw new IllegalStateException(
+                        "SECURITE : DB_URL doit definir sslMode=REQUIRED, VERIFY_CA ou VERIFY_IDENTITY. "
+                                + "Une connexion MySQL sans mode SSL strict est refusee.");
+            }
+        }
     }
 }
