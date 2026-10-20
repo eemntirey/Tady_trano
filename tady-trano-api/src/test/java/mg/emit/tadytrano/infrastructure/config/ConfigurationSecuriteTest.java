@@ -13,9 +13,7 @@ class ConfigurationSecuriteTest {
 
     @Test
     void refuseDemarrageSansDbUrl() {
-        MockEnvironment environment = environnementValide();
-        environment.getPropertySources().remove("mockProperties");
-
+        MockEnvironment environment = environnementSansUrl();
         environment.setProperty("DB_USER", "tady_app");
         environment.setProperty("DB_PASSWORD", "motdepasse-solide");
         environment.setProperty("JWT_SECRET", "secret-de-test-production-long-de-32-caracteres");
@@ -35,8 +33,7 @@ class ConfigurationSecuriteTest {
 
     @Test
     void refuseDemarrageSansDbUser() {
-        MockEnvironment environment = environnementValide();
-        environment.getPropertySources().remove("mockProperties");
+        MockEnvironment environment = environnementSansUtilisateur();
         environment.setProperty("DB_URL", "jdbc:mysql://db.example:3306/tady_trano?sslMode=REQUIRED");
         environment.setProperty("DB_PASSWORD", "motdepasse-solide");
         environment.setProperty("JWT_SECRET", "secret-de-test-production-long-de-32-caracteres");
@@ -96,6 +93,22 @@ class ConfigurationSecuriteTest {
         MockEnvironment test = new MockEnvironment();
         test.setActiveProfiles("test");
         assertDoesNotThrow(() -> configuration.valider(test));
+    }
+
+    private static MockEnvironment environnementSansUrl() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("production");
+        return environment;
+    }
+
+    private static MockEnvironment environnementSansUtilisateur() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("production");
+        environment.setProperty("DB_URL",
+                "jdbc:mysql://db.example:3306/tady_trano?sslMode=REQUIRED&serverTimezone=UTC");
+        environment.setProperty("DB_PASSWORD", "motdepasse-solide");
+        environment.setProperty("JWT_SECRET", "secret-de-test-production-long-de-32-caracteres");
+        return environment;
     }
 
     private static MockEnvironment environnementValide() {
