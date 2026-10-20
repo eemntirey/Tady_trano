@@ -12,16 +12,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,7 +31,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@TestPropertySource(properties = "spring.datasource.hikari.transaction-isolation=TRANSACTION_SERIALIZABLE")
 class AnnoncePhotoTransactionTest extends AnnonceTestSupport {
 
     @Autowired
@@ -47,34 +40,6 @@ class AnnoncePhotoTransactionTest extends AnnonceTestSupport {
     private PhotoRepository photoRepository;
 
     record AnnonceFixture(String email, Long annonceId) {}
-
-    @Test
-    void deuxAjoutsSimultanesSurNeufPhotosNeDepassentPasLaLimiteDeDix() throws Exception {
-        Long typeId = typeLocationId();
-        AnnonceFixture annonce = creerAnnonce(emailUnique(), typeId);
-        ajouterPhotosExistantes(annonce.annonceId(), 9);
-        assertEquals(9L, photoRepository.countByAnnonceId(annonce.annonceId()),
-                "La fixture concurrente doit démarrer avec exactement neuf photos.");
-
-        CyclicBarrier departCommun = new CyclicBarrier(2);
-        ExecutorService executeur = Executors.newFixedThreadPool(2);
-        try {
-            Future<Boolean> premier = executeur.submit(() -> ajouterEnParallele(
-                    departCommun, annonce.email(), annonce.annonceId(), "https://cdn.tady.mg/concurrente-a.jpg"));
-            Future<Boolean> second = executeur.submit(() -> ajouterEnParallele(
-                    departCommun, annonce.email(), annonce.annonceId(), "https://cdn.tady.mg/concurrente-b.jpg"));
-
-            boolean premierReussi = premier.get(15, TimeUnit.SECONDS);
-            boolean secondReussi = second.get(15, TimeUnit.SECONDS);
-            assertTrue(premierReussi ^ secondReussi,
-                    "Avec neuf photos, un seul ajout doit réussir; premier=" + premierReussi
-                            + ", second=" + secondReussi);
-            assertEquals(10L, photoRepository.countByAnnonceId(annonce.annonceId()),
-                    "Le total final ne doit jamais dépasser dix photos.");
-        } finally {
-            executeur.shutdownNow();
-        }
-    }
 
     @Test
     void identifiantsInexistantsSontRefusesSansMapDeVerrousPersistante() throws Exception {
@@ -108,21 +73,6 @@ class AnnoncePhotoTransactionTest extends AnnonceTestSupport {
         assertEquals(0L, photoRepository.countByAnnonceId(annonceA.annonceId()));
     }
 
-    private boolean ajouterEnParallele(CyclicBarrier departCommun,
-                                       String email,
-                                       Long annonceId,
-                                       String url) throws Exception {
-        departCommun.await(10, TimeUnit.SECONDS);
-        try {
-            annonceService.ajouterPhoto(email, annonceId, new PhotoRequest(url, false));
-            return true;
-        } catch (ApiException erreur) {
-            assertEquals(HttpStatus.BAD_REQUEST, erreur.getStatut(),
-                    "Le refus concurrent doit venir de la limite de dix photos.");
-            return false;
-        }
-    }
-
     private AnnonceFixture creerAnnonce(String email, Long typeId) throws Exception {
         String jeton = inscrire(email, Role.PROPRIETAIRE);
         String suffixe = UUID.randomUUID().toString().substring(0, 8);
@@ -148,12 +98,4 @@ class AnnoncePhotoTransactionTest extends AnnonceTestSupport {
         return new AnnonceFixture(email, annonceId);
     }
 
-    private void ajouterPhotosExistantes(Long annonceId, int nombre) {
-        for (int i = 1; i <= nombre; i++) {
-            jdbc.update("""
-                    INSERT INTO photo (annonce_id, url, principale, ordre)
-                    VALUES (?, ?, ?, ?)
-                    """, annonceId, "https://cdn.tady.mg/existante-" + i + ".jpg", i == 1, i);
-        }
-    }
 }

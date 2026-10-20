@@ -64,6 +64,7 @@ jobs:
       - name: Start API against MySQL and verify Flyway V5 and security data
         env:
           DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&sslMode=REQUIRED&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
+          PHOTO_DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano_photo_it?createDatabaseIfNotExist=true&sslMode=REQUIRED&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
           DB_USER: root
           DB_PASSWORD: TadyCiDbPass_2026_Strong_83
           JWT_SECRET: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key-123456
@@ -126,3 +127,9 @@ jobs:
           fi
 
           echo "MySQL/Flyway V5 and demo-data security checks passed."
+
+          # Exercise the transactional photo lock on a separate, real MySQL schema.
+          mvn -B -ntp -pl tady-trano-api \
+            -Dtest=AnnoncePhotoMySqlConcurrencyTest \
+            -Dtady.test.mysql=true \
+            test
