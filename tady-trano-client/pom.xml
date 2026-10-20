@@ -68,10 +68,4 @@
         </plugins>
     </build>
 
-    <profiles>
-        <!-- Le profil jdk-jsobject-26plus a ete supprime : depuis JavaFX 24, le module
-             jdk.jsobject est fourni par OpenJFX lui-meme et est deja declare comme
-             dependance directe ci-dessus. Aucun chemin artefact specifique a un OS
-             n'est donc necessaire. -->
-    </profiles>
 </project>
