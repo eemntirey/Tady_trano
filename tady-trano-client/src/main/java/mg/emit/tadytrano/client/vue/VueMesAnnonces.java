@@ -16,6 +16,9 @@ import mg.emit.tadytrano.client.util.Affichage;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * Espace proprietaire / agence : gestion complete de ses annonces (CDC F2).
@@ -33,6 +36,10 @@ public class VueMesAnnonces extends VBox {
     private final Button precedent = new Button("<");
     private final Button suivant = new Button(">");
     private final Label messageVide = new Label("Aucune annonce publiée pour le moment.");
+    private final Label messageMutation = new Label();
+    private final Button nouvelleAnnonce = new Button("+ Publier une annonce");
+    /** Verrou partagé entre création et modification, conservé jusqu'au rafraîchissement final. */
+    private final AtomicBoolean mutationEnCours = new AtomicBoolean(false);
 
     private int page = 0;
     private int totalPages = 0;
@@ -59,7 +66,6 @@ public class VueMesAnnonces extends VBox {
         Region espace = new Region();
         HBox.setHgrow(espace, Priority.ALWAYS);
 
-        Button nouvelleAnnonce = new Button("+ Publier une annonce");
         nouvelleAnnonce.getStyleClass().add("btn-success-custom");
         // Le serveur exige le role PROPRIETAIRE pour POST /api/annonces :
         // on bloque tot avec un message clair au lieu du 403.
@@ -72,6 +78,9 @@ public class VueMesAnnonces extends VBox {
             ouvrirFormulaire(null);
         });
 
+        messageMutation.getStyleClass().add("muted");
+        messageMutation.visibleProperty().bind(messageMutation.textProperty().isNotEmpty());
+        messageMutation.managedProperty().bind(messageMutation.visibleProperty());
         enTete.getChildren().addAll(titre, espace, nouvelleAnnonce);
 
         // Pagination
@@ -96,47 +105,97 @@ public class VueMesAnnonces extends VBox {
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("scroll-transparent");
 
-        getChildren().addAll(enTete, new Separator(), messageVide, scroll, pagination);
+        getChildren().addAll(enTete, messageMutation, new Separator(), messageVide, scroll, pagination);
     }
 
     private void charger() {
+        charger(null);
+    }
+
+    /**
+     * Charge la liste et, si demandé, signale la fin du rafraîchissement.
+     * Le callback est unique même si la pagination demande un second chargement.
+     */
+    private void charger(Consumer<Boolean> apresChargement) {
+        Consumer<Boolean> callbackUnique = apresChargement;
+        if (apresChargement != null) {
+            AtomicBoolean callbackExecute = new AtomicBoolean(false);
+            callbackUnique = succes -> {
+                if (callbackExecute.compareAndSet(false, true)) {
+                    apresChargement.accept(succes);
+                }
+            };
+        }
+        chargerInterne(callbackUnique);
+    }
+
+    private void chargerInterne(Consumer<Boolean> apresChargement) {
         if (!app.estConnecte()) {
             messageVide.setText("Veuillez vous connecter avec un compte Propriétaire pour voir vos annonces.");
             messageVide.setVisible(true);
             listeAnnonces.getChildren().clear();
+            notifierFinChargement(apresChargement, false);
             return;
         }
         if (!app.estProprietaire()) {
             messageVide.setText("L'espace « Mes annonces » est réservé aux comptes Propriétaire.");
             messageVide.setVisible(true);
             listeAnnonces.getChildren().clear();
+            notifierFinChargement(apresChargement, false);
             return;
         }
 
         final int pageDemandee = page;
         final int gen = ++generation;
-        app.appeler(() -> api.mesAnnonces(pageDemandee, TAILLE_PAGE),
-                reponse -> {
-                    if (gen != generation) {
-                        return; // reponse perimee
-                    }
-                    afficherResultats(reponse);
-                },
-                erreur -> {
-                    if (gen != generation) {
-                        return;
-                    }
-                    app.gererErreur(erreur);
-                });
+        try {
+            app.appeler(() -> api.mesAnnonces(pageDemandee, TAILLE_PAGE),
+                    reponse -> {
+                        if (gen != generation) {
+                            notifierFinChargement(apresChargement, false);
+                            return; // réponse périmée : ne pas garder le verrou de soumission
+                        }
+                        try {
+                            afficherResultats(reponse, apresChargement);
+                        } catch (RuntimeException erreur) {
+                            try {
+                                app.gererErreur(erreur);
+                            } finally {
+                                notifierFinChargement(apresChargement, false);
+                            }
+                        }
+                    },
+                    erreur -> {
+                        try {
+                            if (gen == generation) {
+                                app.gererErreur(erreur);
+                            }
+                        } finally {
+                            notifierFinChargement(apresChargement, false);
+                        }
+                    });
+        } catch (RuntimeException erreur) {
+            try {
+                app.gererErreur(erreur);
+            } finally {
+                notifierFinChargement(apresChargement, false);
+            }
+        }
     }
 
-    private void afficherResultats(PageResponse<AnnonceResumeResponse> reponse) {
+    private static void notifierFinChargement(Consumer<Boolean> callback, boolean succes) {
+        if (callback != null) {
+            callback.accept(succes);
+        }
+    }
+
+    private void afficherResultats(PageResponse<AnnonceResumeResponse> reponse,
+                                   Consumer<Boolean> apresChargement) {
         // Apres une suppression : si la page courante n'existe plus, revenir a la derniere valide.
         if (reponse.contenu().isEmpty() && page > 0) {
             int dernierePage = Math.max(0, reponse.totalPages() - 1);
             if (dernierePage != page) {
                 page = dernierePage;
-                charger();
+                chargerInterne(apresChargement);
                 return;
             }
         }
@@ -149,6 +208,7 @@ public class VueMesAnnonces extends VBox {
         if (reponse.contenu().isEmpty()) {
             messageVide.setText("Vous n'avez pas encore publié d'annonce. Cliquez sur '+ Publier une annonce' pour commencer.");
             messageVide.setVisible(true);
+            notifierFinChargement(apresChargement, true);
             return;
         }
 
@@ -156,6 +216,7 @@ public class VueMesAnnonces extends VBox {
         for (AnnonceResumeResponse annonce : reponse.contenu()) {
             listeAnnonces.getChildren().add(creerLigneAnnonce(annonce));
         }
+        notifierFinChargement(apresChargement, true);
     }
 
     private HBox creerLigneAnnonce(AnnonceResumeResponse a) {
@@ -261,7 +322,14 @@ public class VueMesAnnonces extends VBox {
     }
 
     private void ouvrirFormulaire(Long idModification) {
-        // Le menu n'est pas propose aux non-proprietaires ; garde interne aussi.
+        // Un verrou partagé empêche de créer ET modifier pendant qu'une mutation est en vol.
+        if (mutationEnCours.get()) {
+            messageMutation.setText("Une opération est en cours. Patientez avant d'ouvrir un autre formulaire.");
+            return;
+        }
+        messageMutation.setText("");
+
+        // Le menu n'est pas proposé aux non-proprietaires ; garde interne aussi.
         if (!app.estProprietaire()) {
             Affichage.erreur(new IllegalArgumentException(
                     "L'espace « Mes annonces » est réservé aux comptes Propriétaire."));
@@ -382,45 +450,100 @@ public class VueMesAnnonces extends VBox {
         dialog.getDialogPane().setContent(grid);
 
         Button boutonEnregistrer = (Button) dialog.getDialogPane().lookupButton(enregistrerType);
-        final boolean[] enCours = { false };
+        final AnnonceRequest[] demandeSoumise = { null };
         boutonEnregistrer.addEventFilter(ActionEvent.ACTION, event -> {
-            if (enCours[0]) {
-                event.consume(); // anti double-clic : une seule soumission par ouverture
-                return;
-            }
+            final AnnonceRequest demande;
             try {
-                construireDemande(titreF, descF, typeCombo, quartierCombo,
+                demande = construireDemande(titreF, descF, typeCombo, quartierCombo,
                         prixF, surfaceF, piecesF, latF, lngF);
                 erreurSaisie.setText("");
-                enCours[0] = true;
             } catch (IllegalArgumentException ex) {
                 erreurSaisie.setText(ex.getMessage());
                 event.consume();
+                return;
             }
+
+            if (!mutationEnCours.compareAndSet(false, true)) {
+                String message = "Une opération est déjà en cours. Veuillez patienter.";
+                erreurSaisie.setText(message);
+                messageMutation.setText(message);
+                event.consume();
+                return;
+            }
+
+            demandeSoumise[0] = demande;
+            boutonEnregistrer.setDisable(true);
+            nouvelleAnnonce.setDisable(true);
+            messageMutation.setText("");
         });
 
-        dialog.setResultConverter(bouton -> {
-            if (bouton == enregistrerType) {
-                return construireDemande(titreF, descF, typeCombo, quartierCombo,
-                        prixF, surfaceF, piecesF, latF, lngF);
-            }
-            return null;
-        });
+        dialog.setResultConverter(bouton ->
+                bouton == enregistrerType ? demandeSoumise[0] : null);
 
-        Optional<AnnonceRequest> resultat = dialog.showAndWait();
-        resultat.ifPresent(req -> {
-            if (idModification == null) {
-                app.appeler(() -> api.creerAnnonce(req), r -> {
-                    charger();
-                    Affichage.succes("Annonce publiée.");
-                });
-            } else {
-                app.appeler(() -> api.modifierAnnonce(idModification, req), r -> {
-                    charger();
-                    Affichage.succes("Annonce mise à jour.");
-                });
+        final Optional<AnnonceRequest> resultat;
+        try {
+            resultat = dialog.showAndWait();
+        } catch (RuntimeException erreur) {
+            if (demandeSoumise[0] != null) {
+                terminerMutation(boutonEnregistrer);
             }
-        });
+            app.gererErreur(erreur);
+            return;
+        }
+        if (resultat.isEmpty()) {
+            // Sécurité si le dialogue se ferme après l'acquisition mais sans résultat.
+            if (demandeSoumise[0] != null) {
+                terminerMutation(boutonEnregistrer);
+            }
+            return;
+        }
+
+        if (idModification == null) {
+            soumettreMutation(() -> api.creerAnnonce(resultat.get()), boutonEnregistrer,
+                    "Annonce publiée.");
+        } else {
+            soumettreMutation(() -> api.modifierAnnonce(idModification, resultat.get()),
+                    boutonEnregistrer, "Annonce mise à jour.");
+        }
+    }
+
+    /**
+     * Garde le verrou jusqu'à la fin du HTTP, du rafraîchissement de la liste et du message.
+     * Les callbacks du client API reviennent sur le JavaFX Application Thread.
+     */
+    private <T> void soumettreMutation(Callable<T> operation, Button boutonEnregistrer,
+                                       String messageSucces) {
+        try {
+            app.appeler(operation, resultat -> charger(rafraichissementReussi -> {
+                try {
+                    if (rafraichissementReussi) {
+                        Affichage.succes(messageSucces);
+                    }
+                } finally {
+                    terminerMutation(boutonEnregistrer);
+                }
+            }), erreur -> {
+                try {
+                    app.gererErreur(erreur);
+                } finally {
+                    terminerMutation(boutonEnregistrer);
+                }
+            });
+        } catch (RuntimeException erreur) {
+            try {
+                app.gererErreur(erreur);
+            } finally {
+                terminerMutation(boutonEnregistrer);
+            }
+        }
+    }
+
+    /** Remise à zéro commune aux parcours de création et de modification. */
+    private void terminerMutation(Button boutonEnregistrer) {
+        mutationEnCours.set(false);
+        boutonEnregistrer.setDisable(false);
+        nouvelleAnnonce.setDisable(false);
+        messageMutation.setText("");
     }
 
     private AnnonceRequest construireDemande(TextField titreF, TextArea descF,
