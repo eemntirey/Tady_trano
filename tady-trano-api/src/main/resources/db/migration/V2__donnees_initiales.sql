@@ -101,13 +101,13 @@ INSERT INTO annonce (id, proprietaire_id, type_location_id, quartier_id, titre, 
 INSERT INTO photo (id, annonce_id, url, principale, ordre) VALUES
     -- Annonce 1 (Chambre EMIT)
     (1, 1, 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80', TRUE, 1),
-    (2, 1, 'https://images.unsplash.com/photo-1540518614846-7ede433c4550?auto=format&fit=crop&w=800&q=80', FALSE, 2),
+    (2, 1, 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800&q=80', FALSE, 2),
     -- Annonce 2 (Etage Ampasambazaha)
     (3, 2, 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80', TRUE, 1),
     (4, 2, 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80', FALSE, 2),
     (5, 2, 'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=800&q=80', FALSE, 3),
     -- Annonce 3 (Studio Isaha)
-    (6, 3, 'https://images.unsplash.com/photo-1502005229762-ee1b2b8100ff?auto=format&fit=crop&w=800&q=80', TRUE, 1),
+    (6, 3, 'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80', TRUE, 1),
     (7, 3, 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', FALSE, 2),
     -- Annonce 4 (Chambre Tanambao)
     (8, 4, 'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80', TRUE, 1),
