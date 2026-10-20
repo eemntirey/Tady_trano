@@ -574,7 +574,7 @@
 }
 
 .auth-hero {
-    -fx-background-color: -color-accent-emphasis;
+    -fx-background-color: #182338;
     -fx-background-radius: 20px;
     -fx-padding: 36px;
     -fx-spacing: 18px;
