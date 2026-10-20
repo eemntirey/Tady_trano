@@ -16,6 +16,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import mg.emit.tadytrano.client.TadyTranoApp;
 import mg.emit.tadytrano.client.api.ApiClient;
@@ -609,6 +610,10 @@ public class VueRecherche extends VBox {
         media.getStyleClass().add("card-media");
         media.setPrefSize(230, 136);
         media.setMaxSize(230, 136);
+        Rectangle masqueArrondi = new Rectangle(230, 136);
+        masqueArrondi.setArcWidth(18);
+        masqueArrondi.setArcHeight(18);
+        media.setClip(masqueArrondi);
 
         VBox corps = new VBox(4);
         corps.getStyleClass().add("card-body");
