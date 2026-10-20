@@ -1,16 +1,25 @@
-$javafxPath = 'C:\Users\eemntirey\.m2\repository\org\openjfx'
-$modules = @(
-    "$javafxPath\javafx-base\27\javafx-base-27-win.jar",
-    "$javafxPath\javafx-controls\27\javafx-controls-27-win.jar",
-    "$javafxPath\javafx-fxml\27\javafx-fxml-27-win.jar",
-    "$javafxPath\javafx-graphics\27\javafx-graphics-27-win.jar",
-    "$javafxPath\javafx-web\27\javafx-web-27-win.jar",
-    "$javafxPath\javafx-media\27\javafx-media-27-win.jar",
-    "$javafxPath\jdk-jsobject\27\jdk-jsobject-27-win.jar"
-)
-$modulePath = ($modules -join ';')
-$clientClasses = 'c:\Users\eemntirey\eclipse-workspace\Tady_trano\tady-trano-client\target\classes'
-$cpFile = 'c:\Users\eemntirey\eclipse-workspace\Tady_trano\tady-trano-client\tady-trano-client\cp.txt'
-$classPath = $clientClasses + ';' + (Get-Content $cpFile -Raw)
+$ErrorActionPreference = 'Stop'
 
-java --enable-native-access=ALL-UNNAMED --module-path $modulePath --add-modules jdk.jsobject,javafx.controls,javafx.fxml,javafx.web,javafx.media -cp $classPath mg.emit.tadytrano.client.TadyTranoApp
+# Lance le client JavaFX depuis la racine du dépôt, sans dépendre d'un
+# chemin Windows ou d'un répertoire Eclipse propres à une machine.
+$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$pomPath = Join-Path $repoRoot 'pom.xml'
+
+if (-not (Test-Path -LiteralPath $pomPath -PathType Leaf)) {
+    throw "Impossible de trouver le pom.xml racine dans '$repoRoot'."
+}
+
+if (-not (Get-Command mvn -ErrorAction SilentlyContinue)) {
+    throw "Maven (mvn) est introuvable. Installez Maven et ajoutez-le au PATH."
+}
+
+Push-Location $repoRoot
+try {
+    mvn -pl tady-trano-client javafx:run
+    $exitCode = $LASTEXITCODE
+}
+finally {
+    Pop-Location
+}
+
+exit $exitCode
