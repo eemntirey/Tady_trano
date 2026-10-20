@@ -1,7 +1,10 @@
 package mg.emit.tadytrano.presentation.rest;
 
+import mg.emit.tadytrano.domain.model.FavoriId;
 import mg.emit.tadytrano.domain.model.Role;
+import mg.emit.tadytrano.domain.repository.FavoriRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -10,6 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -26,6 +30,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AnnonceControllerTest extends AnnonceTestSupport {
+
+    @Autowired
+    private FavoriRepository favoriRepository;
 
     // ------------------------------------------------------------------
     // Tests
@@ -200,8 +207,30 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                 .andExpect(status().isCreated());
         Long annonceId = jdbc.queryForObject("SELECT id FROM annonce", Long.class);
 
-        // Un locataire ajoute l'annonce en favori
-        String jetonLocataire = inscrire(emailUnique(), Role.LOCATAIRE);
+        // Un locataire ajoute l'annonce en favori.
+        String emailLocataire = emailUnique();
+        String jetonLocataire = inscrire(emailLocataire, Role.LOCATAIRE);
+        mockMvc.perform(post("/api/favoris/" + annonceId)
+                        .header("Authorization", "Bearer " + jetonLocataire))
+                .andExpect(status().isCreated());
+
+        Long utilisateurId = jdbc.queryForObject(
+                "SELECT id FROM utilisateur WHERE email = ?", Long.class, emailLocataire);
+        FavoriId cle = new FavoriId(utilisateurId, annonceId);
+
+        // Le dépôt doit accepter la vraie clé composite pour les méthodes héritées.
+        assertTrue(favoriRepository.findById(cle).isPresent(),
+                "Le favori ajouté doit être trouvable par FavoriId.");
+        assertTrue(favoriRepository.findByUtilisateurIdAndAnnonceId(utilisateurId, annonceId).isPresent(),
+                "La méthode dérivée existante doit rester fonctionnelle.");
+
+        favoriRepository.deleteById(cle);
+        assertTrue(favoriRepository.findById(cle).isEmpty(),
+                "deleteById(FavoriId) doit supprimer le favori composite.");
+        assertTrue(favoriRepository.findByUtilisateurIdAndAnnonceId(utilisateurId, annonceId).isEmpty(),
+                "Le retrait par clé doit aussi être visible via la méthode dérivée.");
+
+        // Réinsère le favori par l'API pour conserver la vérification du doublon et du retrait HTTP.
         mockMvc.perform(post("/api/favoris/" + annonceId)
                         .header("Authorization", "Bearer " + jetonLocataire))
                 .andExpect(status().isCreated());
