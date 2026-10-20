@@ -11,6 +11,7 @@ import javafx.scene.text.FontWeight;
 import mg.emit.tadytrano.client.TadyTranoApp;
 import mg.emit.tadytrano.client.api.ApiClient;
 import mg.emit.tadytrano.client.dto.*;
+import mg.emit.tadytrano.client.util.ActionEnCours;
 import mg.emit.tadytrano.client.util.Affichage;
 
 import java.math.BigDecimal;
@@ -29,6 +30,8 @@ public class VueMesAnnonces extends VBox {
     private final ApiClient api;
 
     private final VBox listeAnnonces = new VBox(12);
+    private final Button nouvelleAnnonce = new Button("+ Publier une annonce");
+    private final ActionEnCours enregistrementAnnonce = new ActionEnCours();
     private final Label pageLabel = new Label();
     private final Button precedent = new Button("<");
     private final Button suivant = new Button(">");
@@ -59,7 +62,6 @@ public class VueMesAnnonces extends VBox {
         Region espace = new Region();
         HBox.setHgrow(espace, Priority.ALWAYS);
 
-        Button nouvelleAnnonce = new Button("+ Publier une annonce");
         nouvelleAnnonce.getStyleClass().add("btn-success-custom");
         // Le serveur exige le role PROPRIETAIRE pour POST /api/annonces :
         // on bloque tot avec un message clair au lieu du 403.
@@ -101,12 +103,14 @@ public class VueMesAnnonces extends VBox {
 
     private void charger() {
         if (!app.estConnecte()) {
+            terminerEnregistrementAnnonce();
             messageVide.setText("Veuillez vous connecter avec un compte Propriétaire pour voir vos annonces.");
             messageVide.setVisible(true);
             listeAnnonces.getChildren().clear();
             return;
         }
         if (!app.estProprietaire()) {
+            terminerEnregistrementAnnonce();
             messageVide.setText("L'espace « Mes annonces » est réservé aux comptes Propriétaire.");
             messageVide.setVisible(true);
             listeAnnonces.getChildren().clear();
@@ -126,6 +130,7 @@ public class VueMesAnnonces extends VBox {
                     if (gen != generation) {
                         return;
                     }
+                    terminerEnregistrementAnnonce();
                     app.gererErreur(erreur);
                 });
     }
@@ -149,6 +154,7 @@ public class VueMesAnnonces extends VBox {
         if (reponse.contenu().isEmpty()) {
             messageVide.setText("Vous n'avez pas encore publié d'annonce. Cliquez sur '+ Publier une annonce' pour commencer.");
             messageVide.setVisible(true);
+            terminerEnregistrementAnnonce();
             return;
         }
 
@@ -156,6 +162,7 @@ public class VueMesAnnonces extends VBox {
         for (AnnonceResumeResponse annonce : reponse.contenu()) {
             listeAnnonces.getChildren().add(creerLigneAnnonce(annonce));
         }
+        terminerEnregistrementAnnonce();
     }
 
     private HBox creerLigneAnnonce(AnnonceResumeResponse a) {
@@ -265,6 +272,11 @@ public class VueMesAnnonces extends VBox {
         if (!app.estProprietaire()) {
             Affichage.erreur(new IllegalArgumentException(
                     "L'espace « Mes annonces » est réservé aux comptes Propriétaire."));
+            return;
+        }
+        // Une requête de publication/modification doit être terminée avant
+        // d'autoriser une seconde ouverture du formulaire.
+        if (enregistrementAnnonce.estEnCours()) {
             return;
         }
         Dialog<AnnonceRequest> dialog = new Dialog<>();
@@ -409,18 +421,35 @@ public class VueMesAnnonces extends VBox {
 
         Optional<AnnonceRequest> resultat = dialog.showAndWait();
         resultat.ifPresent(req -> {
+            // Le dialogue disparait avant la réponse HTTP : garder un verrou au
+            // niveau de la vue évite une seconde publication depuis la page.
+            if (!enregistrementAnnonce.demarrer()) {
+                return;
+            }
+            nouvelleAnnonce.setDisable(true);
             if (idModification == null) {
                 app.appeler(() -> api.creerAnnonce(req), r -> {
-                    charger();
                     Affichage.succes("Annonce publiée.");
+                    charger();
+                }, err -> {
+                    terminerEnregistrementAnnonce();
+                    app.gererErreur(err);
                 });
             } else {
                 app.appeler(() -> api.modifierAnnonce(idModification, req), r -> {
-                    charger();
                     Affichage.succes("Annonce mise à jour.");
+                    charger();
+                }, err -> {
+                    terminerEnregistrementAnnonce();
+                    app.gererErreur(err);
                 });
             }
         });
+    }
+
+    private void terminerEnregistrementAnnonce() {
+        enregistrementAnnonce.terminer();
+        nouvelleAnnonce.setDisable(false);
     }
 
     private AnnonceRequest construireDemande(TextField titreF, TextArea descF,
