@@ -70,6 +70,15 @@ class ConfigurationSecuriteTest {
     }
 
     @Test
+    void refuseUneUrlMySqlSansModeSslStrict() {
+        MockEnvironment environment = environnementValide();
+        environment.setProperty("DB_URL", "jdbc:mysql://db.example:3306/tady_trano");
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class, () -> configuration.valider(environment));
+        assertTrue(erreur.getMessage().contains("sslMode"));
+    }
+
+    @Test
     void refuseDemarrageAvecRecuperationDeClePubliqueActivee() {
         MockEnvironment environment = environnementValide();
         environment.setProperty("DB_URL",
