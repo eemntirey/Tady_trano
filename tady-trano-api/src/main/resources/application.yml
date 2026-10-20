@@ -6,7 +6,7 @@ spring:
     # local/test : les valeurs sont obligatoires en configuration persistante.
     url: ${DB_URL}
     username: ${DB_USER}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
