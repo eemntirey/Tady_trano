@@ -3,6 +3,7 @@ package mg.emit.tadytrano.presentation.rest;
 import tools.jackson.databind.ObjectMapper;
 import mg.emit.tadytrano.application.dto.LoginRequest;
 import mg.emit.tadytrano.application.dto.RegisterRequest;
+import mg.emit.tadytrano.infrastructure.security.LoginAttemptService;
 import mg.emit.tadytrano.domain.model.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -177,4 +178,27 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(demandeOk)))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void cinqEchecsReelsDeConnexionDeclenchent429ALaTentativeSuivante() throws Exception {
+        String email = emailUnique();
+        inscrireEtRecupererToken(email, "MotDePasse123", Role.LOCATAIRE);
+
+        // Cinq mauvais mots de passe enregistrent cinq échecs réels.
+        for (int i = 0; i < LoginAttemptService.MAX_TENTATIVES; i++) {
+            LoginRequest demande = new LoginRequest(email, "MauvaisMotDePasse");
+            mockMvc.perform(post("/api/auth/connexion")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(demande)))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        // La sixième tentative est bloquée avant l'authentification.
+        LoginRequest sixiemeDemande = new LoginRequest(email, "MauvaisMotDePasse");
+        mockMvc.perform(post("/api/auth/connexion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(sixiemeDemande)))
+                .andExpect(status().isTooManyRequests());
+    }
+
 }

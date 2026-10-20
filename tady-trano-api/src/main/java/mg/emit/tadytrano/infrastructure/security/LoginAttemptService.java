@@ -1,9 +1,12 @@
 package mg.emit.tadytrano.infrastructure.security;
 
 import mg.emit.tadytrano.application.exception.ApiException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,27 +28,53 @@ public class LoginAttemptService {
     public static final long DUREE_BLOCAGE_SECONDES = 15 * 60; // 15 minutes
 
     private final Map<String, Tentative> tentatives = new ConcurrentHashMap<>();
+    private final Clock horloge;
+
+    /** Conserve le constructeur sans argument utilisé par Spring en production. */
+    @Autowired
+    public LoginAttemptService() {
+        this(Clock.systemUTC());
+    }
+
+    // Horloge injectable pour tester l'expiration sans attendre 15 minutes réelles.
+    LoginAttemptService(Clock horloge) {
+        this.horloge = horloge;
+    }
 
     /**
-     * Verifie que l'email n'est pas temporairement bloque.
-     * Lance une ApiException (423) si le seuil d'echecs est depasse.
+     * Vérifie si l'email est temporairement bloqué.
+     *
+     * La fenêtre est FIXE : elle commence au premier échec et dure
+     * DUREE_BLOCAGE_SECONDES. Un contrôle intermédiaire ne doit pas effacer
+     * le compteur ; seul un succès ou l'expiration de cette fenêtre le réinitialise.
+     * Une suppression conditionnelle évite d'effacer un compteur modifié en parallèle.
      */
     public void verifierPasBloque(String email) {
-        Tentative t = tentatives.get(email);
-        if (t == null) {
+        while (true) {
+            Tentative t = tentatives.get(email);
+            if (t == null) {
+                return;
+            }
+
+            Instant maintenant = horloge.instant();
+            Instant finFenetre = t.premierEchec.plusSeconds(DUREE_BLOCAGE_SECONDES);
+            if (!maintenant.isBefore(finFenetre)) {
+                if (tentatives.remove(email, t)) {
+                    return;
+                }
+                // L'entrée a changé après get() : relire avant de décider.
+                continue;
+            }
+
+            if (t.echecs >= MAX_TENTATIVES) {
+                long restant = Duration.between(maintenant, finFenetre).toSeconds();
+                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Trop de tentatives de connexion echec pour ce compte. "
+                                + "Nouvel essai possible dans environ %d minute(s)."
+                                .formatted(Math.max(1, restant / 60)));
+            }
             return;
         }
-        if (t.echecs >= MAX_TENTATIVES
-                && Instant.now().isBefore(t.premierEchec.plusSeconds(DUREE_BLOCAGE_SECONDES))) {
-            long restant = t.premierEchec.plusSeconds(DUREE_BLOCAGE_SECONDES)
-                    .getEpochSecond() - Instant.now().getEpochSecond();
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS,
-                    "Trop de tentatives de connexion echec pour ce compte. "
-                            + "Nouvel essai possible dans environ %d minute(s)."
-                            .formatted(Math.max(1, restant / 60)));
-        }
-        // Delai de blocage depasse : on reinitialise le compteur.
-        tentatives.remove(email);
     }
 
     /**
@@ -55,7 +84,7 @@ public class LoginAttemptService {
     public void enregistrerEchec(String email) {
         tentatives.compute(email, (cle, existante) -> {
             if (existante == null) {
-                return new Tentative(1, Instant.now());
+                return new Tentative(1, horloge.instant());
             }
             return new Tentative(existante.echecs + 1, existante.premierEchec);
         });
