@@ -37,7 +37,7 @@
             <artifactId>javafx-web</artifactId>
             <version>${javafx.version}</version>
         </dependency>
-        <!-- JDK 26+ : jdk.jsobject (requis par javafx.web) est fourni par OpenJFX -->
+        <!-- Depuis JavaFX 24+, jdk.jsobject est fourni par OpenJFX via javafx-web -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>jdk-jsobject</artifactId>
