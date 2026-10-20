@@ -125,3 +125,19 @@ jobs:
           fi
 
           echo "MySQL/Flyway V4 and demo-data security checks passed."
+
+          # These settings must be rejected before DataSource/Flyway can use
+          # the fallback values from application.yml.
+          if env -u DB_URL mvn -B -ntp -pl tady-trano-api spring-boot:run -Dspring-boot.run.arguments=--server.port=8081 > /tmp/tady-trano-missing-db-url.log 2>&1; then
+            echo "Expected startup to fail when DB_URL is absent."
+            exit 1
+          fi
+          grep -F "SECURITE : DB_URL est obligatoire" /tmp/tady-trano-missing-db-url.log
+
+          if env -u DB_USER mvn -B -ntp -pl tady-trano-api spring-boot:run -Dspring-boot.run.arguments=--server.port=8081 > /tmp/tady-trano-missing-db-user.log 2>&1; then
+            echo "Expected startup to fail when DB_USER is absent."
+            exit 1
+          fi
+          grep -F "SECURITE : DB_USER est obligatoire" /tmp/tady-trano-missing-db-user.log
+
+          echo "Fail-closed DB_URL/DB_USER startup checks passed."
