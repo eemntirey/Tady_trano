@@ -1,11 +1,13 @@
 package mg.emit.tadytrano.domain.repository;
 
 import mg.emit.tadytrano.domain.model.Annonce;
+import jakarta.persistence.LockModeType;
 import mg.emit.tadytrano.domain.model.StatutAnnonce;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -80,7 +82,14 @@ public interface AnnonceRepository extends JpaRepository<Annonce, Long> {
 
     Optional<Annonce> findByIdAndProprietaireId(Long id, Long proprietaireId);
 
-
+    /**
+     * Charge une annonce avec un verrou d'ecriture en base.
+     * Le verrou est conserve jusqu'a la fin de la transaction appelante,
+     * contrairement a un verrou Java libere avant le commit.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from Annonce a where a.id = :id")
+    Optional<Annonce> trouverPourModification(@Param("id") Long id);
 
     // Pour l'administration (F10)
     @EntityGraph(attributePaths = {"typeLocation", "quartier", "quartier.ville"})

@@ -37,8 +37,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -60,9 +58,6 @@ public class AnnonceService {
     private final TypeLocationRepository typeLocationRepository;
     private final ProprietaireService proprietaireService;
     private final ReferentielService referentielService;
-
-    // Verrous applicatifs par annonce pour serialiser les mutations concurrentes (A-05).
-    private final ConcurrentHashMap<Long, ReentrantLock> verrous = new ConcurrentHashMap<>();
 
     /**
      * Recherche publique : uniquement les annonces actives, filtres optionnels,
@@ -239,13 +234,20 @@ public class AnnonceService {
 
     @Transactional
     public PhotoResponse ajouterPhoto(String email, Long annonceId, PhotoRequest demande) {
-        // Verrou applicatif par annonce pour serialiser les mutations concurrentes (A-05).
-        ReentrantLock verrou = verrous.computeIfAbsent(annonceId, k -> new ReentrantLock());
-        verrou.lock();
-        try {
-            Annonce annonce = annonceDeProprietaire(email, annonceId);
-            List<Photo> existantes = photoRepository.findByAnnonceIdOrderByOrdreAsc(annonceId);
-            if (existantes.size() >= MAX_PHOTOS_PAR_ANNONCE) {
+        // Le verrou SQL reste actif jusqu'au commit de cette transaction.
+        // On verrouille l'annonce avant de vérifier son propriétaire et de compter ses photos.
+        Annonce annonce = annonceRepository.trouverPourModification(annonceId)
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN,
+                        "Annonce non attribuee a ce proprietaire"));
+
+        Proprietaire proprietaire = proprietaireService.parEmail(email);
+        if (!annonce.getProprietaire().getId().equals(proprietaire.getId())) {
+            throw new ApiException(HttpStatus.FORBIDDEN,
+                    "Annonce non attribuee a ce proprietaire");
+        }
+
+        List<Photo> existantes = photoRepository.findByAnnonceIdOrderByOrdreAsc(annonceId);
+        if (existantes.size() >= MAX_PHOTOS_PAR_ANNONCE) {
             throw new ApiException(HttpStatus.BAD_REQUEST,
                     "Nombre maximum de photos atteint (" + MAX_PHOTOS_PAR_ANNONCE + ")");
         }
@@ -266,9 +268,6 @@ public class AnnonceService {
         photo.setPrincipale(demande.principale() || existantes.isEmpty());
         photo.setOrdre(ordreSuivant);
         return PhotoResponse.depuis(photoRepository.save(photo));
-        } finally {
-            verrou.unlock();
-        }
     }
 
     @Transactional
