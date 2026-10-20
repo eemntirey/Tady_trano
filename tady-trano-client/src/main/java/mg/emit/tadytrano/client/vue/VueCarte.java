@@ -109,7 +109,7 @@ public class VueCarte extends VBox {
     private void initialiserCarte() {
         // Clic sur un marqueur de la carte -> ouverture du detail
         carteView.getBridge().setOnAnnonceClick(annonceId -> {
-            app.ouvrirDetail(annonceId, () -> app.ouvrir(this));
+            app.ouvrirDetail(annonceId, () -> app.afficherSansHistorique(this));
         });
 
         // D9 : le pont onMapClick etait declare sans ecoutant ; il pose le repere.
