@@ -61,7 +61,7 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Start API against MySQL and verify Flyway V4 and security data
+      - name: Start API against MySQL and verify Flyway V5 and security data
         env:
           DB_URL: jdbc:mysql://127.0.0.1:3306/tady_trano?createDatabaseIfNotExist=true&sslMode=REQUIRED&serverTimezone=Indian/Antananarivo&characterEncoding=utf8
           DB_USER: root
@@ -98,10 +98,10 @@ jobs:
           fi
 
           # A successful start with ddl-auto=validate proves that Flyway created
-          # the schema expected by the entities and applied migrations V1-V4.
-          grep -E "Successfully applied 4 migrations|securisation donnees demo" /tmp/tady-trano-api.log
+          # the schema expected by the entities and applied migrations V1-V5.
+          grep -E "Successfully applied 5 migrations|securisation donnees demo" /tmp/tady-trano-api.log
 
-          # Assert the V4 production-safety migration changed the seeded demo data.
+          # Assert V4 disables demo accounts and V5 marks the seeded test ad as admin-moderated.
           demo_accounts_active=$(mysql --protocol=TCP -h 127.0.0.1 -uroot -p"$DB_PASSWORD" --batch --skip-column-names -e "
             SELECT COUNT(*) FROM utilisateur
             WHERE email IN (
@@ -114,14 +114,15 @@ jobs:
             exit 1
           fi
 
-          demo_ads_masked=$(mysql --protocol=TCP -h 127.0.0.1 -uroot -p"$DB_PASSWORD" --batch --skip-column-names -e "
+          demo_ads_moderated=$(mysql --protocol=TCP -h 127.0.0.1 -uroot -p"$DB_PASSWORD" --batch --skip-column-names -e "
             SELECT COUNT(*) FROM annonce
             WHERE titre = 'Offre suspecte prix derisoire pour test moderation'
-              AND statut = 'MASQUEE';
+              AND statut = 'MASQUEE'
+              AND masquee_par_admin = TRUE;
           " tady_trano)
-          if [ "$demo_ads_masked" -lt 1 ]; then
-            echo "Expected the seeded moderation test ad to be hidden by V4."
+          if [ "$demo_ads_moderated" -lt 1 ]; then
+            echo "Expected the seeded test ad to be hidden and marked as admin-moderated by V5."
             exit 1
           fi
 
-          echo "MySQL/Flyway V4 and demo-data security checks passed."
+          echo "MySQL/Flyway V5 and demo-data security checks passed."
