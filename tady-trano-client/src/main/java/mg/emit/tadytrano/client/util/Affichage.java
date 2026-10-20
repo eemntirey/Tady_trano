@@ -1,6 +1,8 @@
 package mg.emit.tadytrano.client.util;
 
 import javafx.application.Platform;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.scene.control.Alert;
@@ -88,6 +90,11 @@ public final class Affichage {
      * contrairement a un simple getImage() pris pendant le chargement asynchrone.
      */
     public static void charger(ImageView vue, String url, double largeur, double hauteur) {
+        charger(vue, url, largeur, hauteur, 0);
+    }
+
+    /** Une seconde tentative seulement, en cas d'échec réseau transitoire. */
+    private static void charger(ImageView vue, String url, double largeur, double hauteur, int tentative) {
         Objects.requireNonNull(vue, "vue");
         vue.setFitWidth(largeur);
         vue.setFitHeight(hauteur);
@@ -141,7 +148,8 @@ public final class Affichage {
             return;
         }
 
-        new SuiviChargement(vue, image, placeholder, cle, generation).attacher();
+        new SuiviChargement(vue, image, placeholder, cle, generation,
+                url, largeur, hauteur, tentative).attacher();
     }
 
     /**
@@ -264,6 +272,10 @@ public final class Affichage {
         private final Image placeholder;
         private final String cle;
         private final long generation;
+        private final String url;
+        private final double largeur;
+        private final double hauteur;
+        private final int tentative;
         private boolean termine;
         private final ChangeListener<Number> ecouteProgression =
                 (observable, ancien, nouveau) -> verifier();
@@ -271,12 +283,17 @@ public final class Affichage {
                 (observable, ancien, nouveau) -> verifier();
 
         private SuiviChargement(ImageView vue, Image image, Image placeholder,
-                                String cle, long generation) {
+                                String cle, long generation, String url,
+                                double largeur, double hauteur, int tentative) {
             this.vue = vue;
             this.image = image;
             this.placeholder = placeholder;
             this.cle = cle;
             this.generation = generation;
+            this.url = url;
+            this.largeur = largeur;
+            this.hauteur = hauteur;
+            this.tentative = tentative;
         }
 
         private void attacher() {
@@ -314,6 +331,20 @@ public final class Affichage {
                     return; // une autre URL a ete demandee entre-temps
                 }
                 vue.setImage(succes ? image : placeholder);
+
+                // Les erreurs HTTP transitoires ne doivent pas laisser la vignette
+                // vide tant qu'une seule tentative supplementaire est raisonnable.
+                if (!succes && tentative == 0) {
+                    PauseTransition delai = new PauseTransition(Duration.millis(600));
+                    delai.setOnFinished(e -> {
+                        Object derniereGeneration = vue.getProperties().get(CLE_GENERATION);
+                        if (derniereGeneration instanceof Long valeurActuelle
+                                && valeurActuelle.longValue() == generation) {
+                            charger(vue, url, largeur, hauteur, 1);
+                        }
+                    });
+                    delai.play();
+                }
             });
         }
     }
