@@ -9,7 +9,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -582,21 +581,4 @@ class AnnonceControllerTest extends AnnonceTestSupport {
                         .content(titreVide))
                 .andExpect(status().isBadRequest());
     }
-
-    @Test
-    void migrationMarqueAnnonceDemoCommeMasqueeParAdmin() {
-        String titre = "Offre suspecte prix dérisoire pour test modération";
-
-        String statut = jdbc.queryForObject(
-                "SELECT statut FROM annonce WHERE titre = ?", String.class, titre);
-        Boolean masqueeParAdmin = jdbc.queryForObject(
-                "SELECT masquee_par_admin FROM annonce WHERE titre = ?", Boolean.class, titre);
-
-        assertEquals("MASQUEE", statut,
-                "L'annonce de démonstration doit rester masquée après les migrations");
-        assertEquals(Boolean.TRUE, masqueeParAdmin,
-                "Le verrou de modération doit empêcher le propriétaire de réactiver l'annonce");
-    }
-
-
 }
