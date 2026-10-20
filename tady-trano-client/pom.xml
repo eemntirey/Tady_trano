@@ -15,9 +15,8 @@
     <description>Client desktop JavaFX de l'application de location de maisons</description>
 
     <properties>
-        <!-- 27 : aligne sur le JDK 27 installe ici ; depuis JavaFX 24 le module
-             jdk.jsobject (exige par javafx.web) est fourni par JavaFX lui-meme,
-             il a ete supprime du JDK en 26 -->
+        <!-- JavaFX 27 validée avec JDK 25 en CI (Temurin). Ne pas modifier sans
+             revalider la WebView et le module JavaScript (jdk.jsobject) du client. -->
         <javafx.version>27</javafx.version>
     </properties>
 
@@ -25,11 +24,6 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
         </dependency>
         <dependency>
@@ -73,10 +67,4 @@
         </plugins>
     </build>
 
-    <profiles>
-        <!-- Le profil jdk-jsobject-26plus a ete supprime : depuis JavaFX 24, le module
-             jdk.jsobject est fourni par OpenJFX lui-meme et est deja declare comme
-             dependance directe ci-dessus. Aucun chemin artefact specifique a un OS
-             n'est donc necessaire. -->
-    </profiles>
 </project>

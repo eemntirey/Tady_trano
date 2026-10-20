@@ -75,6 +75,11 @@ public class TadyTranoApp extends Application {
         themeManager.initialiser(scene);
         fenetre.setTitle("Tady Trano");
         fenetre.setScene(scene);
+        // À la fermeture de l'application, aucune carte ne doit garder sa WebView abonnée.
+        fenetre.setOnHidden(e -> {
+            libererRessourcesVueAbandonnee(racine.getCenter());
+            effacerHistorique();
+        });
         fenetre.show();
     }
 
@@ -215,6 +220,12 @@ public class TadyTranoApp extends Application {
     }
 
     private void afficherSansEmpiler(Node vue) {
+        Node precedente = racine.getCenter();
+        // Une vue présente dans l'historique doit rester vivante pour le bouton Retour.
+        // On ne libère une carte que si elle quitte aussi cet historique.
+        if (precedente != null && precedente != vue && !historiqueVues.contains(precedente)) {
+            libererRessourcesVueAbandonnee(precedente);
+        }
         racine.setCenter(vue);
         if (vue instanceof Parent parent) {
             majBoutonActif(parent);
@@ -223,8 +234,26 @@ public class TadyTranoApp extends Application {
     }
 
     private void effacerHistorique() {
+        Node courante = racine == null ? null : racine.getCenter();
+        // Déconnexion / retour connexion abandonne les vues cachées de l'historique.
+        for (Node vue : historiqueVues) {
+            if (vue != courante) {
+                libererRessourcesVueAbandonnee(vue);
+            }
+        }
         historiqueVues.clear();
         retourDisponible.set(false);
+    }
+
+    /**
+     * Point d'appel central du cycle de vie carte : utilisé lors du remplacement
+     * définitif d'une vue, de l'effacement de l'historique et à la fermeture.
+     * Une carte encore affichée ou conservée pour Retour n'est pas libérée.
+     */
+    private void libererRessourcesVueAbandonnee(Node vue) {
+        if (vue instanceof VueCarte vueCarte) {
+            vueCarte.liberer();
+        }
     }
 
     /** Ouvre la page officielle de support pour contacter l'équipe et signaler un défaut. */

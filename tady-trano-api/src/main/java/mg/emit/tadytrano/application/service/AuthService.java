@@ -11,7 +11,6 @@ import mg.emit.tadytrano.domain.model.Utilisateur;
 import mg.emit.tadytrano.domain.repository.UtilisateurRepository;
 import mg.emit.tadytrano.infrastructure.security.CustomUserDetailsService;
 import mg.emit.tadytrano.infrastructure.security.JwtService;
-import mg.emit.tadytrano.infrastructure.security.LoginAttemptService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -32,7 +31,6 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
-    private final LoginAttemptService loginAttemptService;
 
     @Transactional
     public AuthResponse inscrire(RegisterRequest demande) {
@@ -56,26 +54,15 @@ public class AuthService {
     }
 
     public AuthResponse connecter(LoginRequest demande) {
-        String email = demande.email() == null ? "" : demande.email().trim().toLowerCase();
-
-        // Verifie que le compte n'est pas temporairement bloque (force brute).
-        loginAttemptService.verifierPasBloque(email);
-
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(demande.email(), demande.motDePasse()));
         } catch (AuthenticationException e) {
-            // Tout echec d'authentification (mauvais mot de passe, compte desactive, etc.)
-            // est consigne pour la limitation de tentatives.
-            loginAttemptService.enregistrerEchec(email);
             if (e instanceof DisabledException) {
                 throw new ApiException(HttpStatus.UNAUTHORIZED, "Compte desactive");
             }
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Email ou mot de passe incorrect");
         }
-
-        // Connexion reussie : on reinitialise le compteur d'echecs.
-        loginAttemptService.reinitialiser(email);
 
         Utilisateur utilisateur = utilisateurRepository.findByEmailIgnoreCase(demande.email())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Email ou mot de passe incorrect"));

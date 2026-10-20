@@ -48,6 +48,23 @@ public class ThemeManager {
         ecouteur.accept(modeSombre);
     }
 
+    /** Retire l'abonnement d'un composant qui est réellement abandonné. */
+    public void retirerEcouteur(Consumer<Boolean> ecouteur) {
+        ecouteurs.remove(ecouteur);
+    }
+
+    /** Nombre d'abonnements actifs, accessible aux tests du package. */
+    int nombreEcouteurs() {
+        return ecouteurs.size();
+    }
+
+    /** Séparé de l'application du thème pour tester la liste sans démarrer JavaFX. */
+    void notifierEcouteurs() {
+        for (Consumer<Boolean> ecouteur : ecouteurs) {
+            ecouteur.accept(modeSombre);
+        }
+    }
+
     private void appliquerTheme() {
         Application.setUserAgentStylesheet(modeSombre
                 ? new PrimerDark().getUserAgentStylesheet()
@@ -71,8 +88,6 @@ public class ThemeManager {
             }
         }
 
-        for (Consumer<Boolean> ecouteur : ecouteurs) {
-            ecouteur.accept(modeSombre);
-        }
+        notifierEcouteurs();
     }
 }

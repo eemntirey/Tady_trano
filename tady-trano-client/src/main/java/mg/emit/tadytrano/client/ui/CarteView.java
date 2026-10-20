@@ -1,5 +1,6 @@
 package mg.emit.tadytrano.client.ui;
 
+import javafx.beans.value.ChangeListener;
 import javafx.concurrent.Worker;
 import javafx.scene.layout.StackPane;
 import javafx.scene.web.WebEngine;
@@ -10,6 +11,7 @@ import netscape.javascript.JSObject;
 
 import java.net.URL;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Composant de carte Leaflet OpenStreetMap integre via un WebView JavaFX (CDC F7).
@@ -29,12 +31,24 @@ public class CarteView extends StackPane {
     private Double[] centrageEnAttente;
     /** Dernier theme applique en JS (evite d'executer le script pour rien). */
     private Boolean themeApplique;
+    private boolean liberee;
+    /** Même instance utilisée pour l'inscription et le retrait de l'écouteur. */
+    private final Consumer<Boolean> ecouteTheme = sombre -> {
+        if (!liberee && pageChargee) {
+            appliquerThemeCarte(sombre);
+        }
+    };
+    /** Garder la référence pour pouvoir détacher aussi l'écouteur du chargement WebView. */
+    private final ChangeListener<Worker.State> ecouteurChargement;
 
     public CarteView() {
         getChildren().add(webView);
 
         webEngine.setJavaScriptEnabled(true);
-        webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
+        this.ecouteurChargement = (obs, oldState, newState) -> {
+            if (liberee) {
+                return;
+            }
             if (newState == Worker.State.SUCCEEDED) {
                 JSObject win = (JSObject) webEngine.executeScript("window");
                 win.setMember("javaBridge", bridge);
@@ -64,19 +78,44 @@ public class CarteView extends StackPane {
                     centrageEnAttente = null;
                 }
             }
-        });
+        };
+        webEngine.getLoadWorker().stateProperty().addListener(ecouteurChargement);
 
         // Suit les bascules de l'application : la carte Leaflet doit rester coherente.
-        ThemeManager.instance().ajouterEcouteur(sombre -> {
-            if (pageChargee) {
-                appliquerThemeCarte(sombre);
-            }
-        });
+        ThemeManager.instance().ajouterEcouteur(ecouteTheme);
 
         URL mapUrl = getClass().getResource("/mg/emit/tadytrano/client/web/map.html");
         if (mapUrl != null) {
             webEngine.load(mapUrl.toExternalForm());
         }
+    }
+
+    /**
+     * Libère la WebView quand sa VueCarte n'est plus ni affichée ni conservée dans l'historique.
+     * À appeler sur le JavaFX Application Thread. Les appels répétés sont sans effet.
+     */
+    public void liberer() {
+        if (liberee) {
+            return;
+        }
+        liberee = true;
+
+        ThemeManager.instance().retirerEcouteur(ecouteTheme);
+        webEngine.getLoadWorker().stateProperty().removeListener(ecouteurChargement);
+        bridge.setOnAnnonceClick(null);
+        bridge.setOnMapClick(null);
+        bridge.setOnMapReady(null);
+
+        pageChargee = false;
+        annoncesEnAttente = null;
+        latAttente = null;
+        lngAttente = null;
+        labelAttente = null;
+        centrageEnAttente = null;
+
+        // Décharge le document et son pont JavaScript; cette WebView ne sera plus réutilisée.
+        webEngine.load(null);
+        getChildren().clear();
     }
 
     /** Pousse le theme dans map.html (tuiles + CSS popups). */

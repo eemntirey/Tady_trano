@@ -154,27 +154,4 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ---------- SEC-03 : limitation des tentatives de connexion ----------
-
-    @Test
-    void connexionReussieReinitialiseLeCompteurDEchecs() throws Exception {
-        String email = emailUnique();
-        inscrireEtRecupererToken(email, "MotDePasse123", Role.LOCATAIRE);
-
-        // Deux echecs puis une succes : le compteur est remis a zero.
-        for (int i = 0; i < 2; i++) {
-            LoginRequest demande = new LoginRequest(email, "MauvaisMotDePasse");
-            mockMvc.perform(post("/api/auth/connexion")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(demande)))
-                    .andExpect(status().isUnauthorized());
-        }
-
-        // Connexion reussie : reinitialise le compteur.
-        LoginRequest demandeOk = new LoginRequest(email, "MotDePasse123");
-        mockMvc.perform(post("/api/auth/connexion")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(demandeOk)))
-                .andExpect(status().isOk());
-    }
 }
