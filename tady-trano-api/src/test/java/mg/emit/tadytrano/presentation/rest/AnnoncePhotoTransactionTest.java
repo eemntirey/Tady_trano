@@ -53,6 +53,8 @@ class AnnoncePhotoTransactionTest extends AnnonceTestSupport {
         Long typeId = typeLocationId();
         AnnonceFixture annonce = creerAnnonce(emailUnique(), typeId);
         ajouterPhotosExistantes(annonce.annonceId(), 9);
+        assertEquals(9L, photoRepository.countByAnnonceId(annonce.annonceId()),
+                "La fixture concurrente doit démarrer avec exactement neuf photos.");
 
         CyclicBarrier departCommun = new CyclicBarrier(2);
         ExecutorService executeur = Executors.newFixedThreadPool(2);
@@ -65,7 +67,8 @@ class AnnoncePhotoTransactionTest extends AnnonceTestSupport {
             boolean premierReussi = premier.get(15, TimeUnit.SECONDS);
             boolean secondReussi = second.get(15, TimeUnit.SECONDS);
             assertTrue(premierReussi ^ secondReussi,
-                    "Un seul ajout doit réussir lorsque l'annonce contient déjà neuf photos.");
+                    "Avec neuf photos, un seul ajout doit réussir; premier=" + premierReussi
+                            + ", second=" + secondReussi);
             assertEquals(10L, photoRepository.countByAnnonceId(annonce.annonceId()),
                     "Le total final ne doit jamais dépasser dix photos.");
         } finally {
