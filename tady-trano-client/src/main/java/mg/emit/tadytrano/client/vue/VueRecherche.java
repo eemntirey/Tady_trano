@@ -583,14 +583,14 @@ public class VueRecherche extends VBox {
     /** Carte annonce cliquable (vignette pleine largeur + titre + prix + lieu). */
     private VBox carte(AnnonceResumeResponse annonce) {
         VBox carte = new VBox();
-        carte.setPrefWidth(190);
-        carte.setMaxWidth(190);
+        carte.setPrefWidth(230);
+        carte.setMaxWidth(230);
         carte.getStyleClass().add("annonce-card");
 
-        StackPane media = new StackPane(Affichage.vignette(annonce.urlPhotoPrincipale(), 190, 112));
+        StackPane media = new StackPane(Affichage.vignette(annonce.urlPhotoPrincipale(), 230, 136));
         media.getStyleClass().add("card-media");
-        media.setPrefSize(190, 112);
-        media.setMaxSize(190, 112);
+        media.setPrefSize(230, 136);
+        media.setMaxSize(230, 136);
 
         VBox corps = new VBox(4);
         corps.getStyleClass().add("card-body");
@@ -598,7 +598,7 @@ public class VueRecherche extends VBox {
         Label titre = new Label(annonce.titre());
         titre.getStyleClass().add("card-title");
         titre.setWrapText(true);
-        titre.setMaxHeight(36);
+        titre.setMaxHeight(42);
 
         Label prixLabel = new Label(Affichage.prix(annonce.prix()));
         prixLabel.getStyleClass().add("card-price");
@@ -632,7 +632,7 @@ public class VueRecherche extends VBox {
 
         carte.getChildren().addAll(media, corps);
         // Réaffiche le même objet vue pour conserver la liste et sa position de défilement.
-        carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), () -> app.ouvrir(this)));
+        carte.setOnMouseClicked(e -> app.ouvrirDetail(annonce.id(), () -> app.afficherSansHistorique(this)));
         return carte;
     }
 }
